@@ -30,7 +30,6 @@
         .agent-avatar {
             font-size: 4rem;
             margin-bottom: 20px;
-            animation: pulse 2s infinite;
         }
         
         .agent-name {
@@ -45,19 +44,8 @@
             padding: 10px 20px;
             border-radius: 25px;
             display: inline-block;
-        }
-        
-        .status-listening { 
             background: rgba(34, 197, 94, 0.3);
             color: #4ade80;
-        }
-        .status-speaking { 
-            background: rgba(251, 191, 36, 0.3);
-            color: #fbbf24;
-        }
-        .status-processing { 
-            background: rgba(96, 165, 250, 0.3);
-            color: #60a5fa;
         }
         
         .transcript-box {
@@ -70,26 +58,6 @@
             overflow-y: auto;
             text-align: left;
         }
-        
-        .speaking-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            background: #4ade80;
-            border-radius: 50%;
-            margin-right: 8px;
-            animation: blink 1s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-        
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0.3; }
-        }
     </style>
 </head>
 <body>
@@ -97,12 +65,10 @@
         <div class="agent-avatar">🤖</div>
         <div class="agent-name">AI Assistant</div>
         <div class="agent-status" id="status">Initializing...</div>
-        
-        <div class="transcript-box" id="transcript">
-            <div>Ready to assist with your meeting...</div>
-        </div>
+        <div class="transcript-box" id="transcript"></div>
     </div>
     
-    <script src="agent.js"></script>
+    <!-- This version number will force the browser to load the new script -->
+    <script src="agent.js?v=3.0.0"></script>
 </body>
 </html>
