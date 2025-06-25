@@ -245,45 +245,143 @@ class MeetingAI {
     speak(text) {
         this.updateStatus('Speaking...', 'speaking');
         
-        // Cancel any ongoing speech
-        this.synthesis.cancel();
+        // Display the text immediately for visual feedback
+        this.transcriptEl.innerHTML = `
+            <div><strong>🗣️ AI:</strong> "${text}"</div>
+            ${this.transcriptEl.innerHTML}
+        `;
         
-        const utterance = new SpeechSynthesisUtterance(text);
+        // Try multiple approaches for audio output
+        this.attemptSpeech(text);
+    }
+    
+    async attemptSpeech(text) {
+        let speechSuccessful = false;
         
-        // Configure voice for professional sound
-        const voices = this.synthesis.getVoices();
-        const preferredVoice = voices.find(voice => 
-            voice.name.includes('Google') || 
-            voice.name.includes('Microsoft') ||
-            voice.name.includes('Alex') ||
-            voice.lang.includes('en-US')
-        );
-        
-        if (preferredVoice) {
-            utterance.voice = preferredVoice;
+        // Method 1: Try native speechSynthesis
+        if ('speechSynthesis' in window) {
+            try {
+                await this.trySpeechSynthesis(text);
+                speechSuccessful = true;
+            } catch (error) {
+                console.warn('Speech synthesis failed:', error);
+            }
         }
         
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 0.8;
+        // Method 2: If speech synthesis fails, try creating an audio element
+        if (!speechSuccessful) {
+            try {
+                await this.tryAudioElement(text);
+                speechSuccessful = true;
+            } catch (error) {
+                console.warn('Audio element method failed:', error);
+            }
+        }
         
-        utterance.onstart = () => {
-            this.transcriptEl.innerHTML = `
-                <div><strong>🗣️ AI:</strong> "${text}"</div>
-                ${this.transcriptEl.innerHTML}
-            `;
-        };
+        // Method 3: Fallback to visual-only mode with longer display
+        if (!speechSuccessful) {
+            console.log('Audio output not available, using visual-only mode');
+            this.updateStatus('Speaking (Visual Mode)', 'speaking');
+            
+            // Keep the message visible longer in visual-only mode
+            setTimeout(() => {
+                this.updateStatus('Ready (Visual Mode)', 'listening');
+            }, 3000);
+        }
+    }
+    
+    trySpeechSynthesis(text) {
+        return new Promise((resolve, reject) => {
+            // Cancel any ongoing speech
+            this.synthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Wait for voices to load
+            const setVoiceAndSpeak = () => {
+                const voices = this.synthesis.getVoices();
+                
+                // Try to find a good voice
+                const preferredVoice = voices.find(voice => 
+                    (voice.name.includes('Google') && voice.lang.includes('en')) ||
+                    (voice.name.includes('Microsoft') && voice.lang.includes('en')) ||
+                    (voice.name.includes('Alex')) ||
+                    (voice.lang.includes('en-US'))
+                ) || voices.find(voice => voice.lang.includes('en')) || voices[0];
+                
+                if (preferredVoice) {
+                    utterance.voice = preferredVoice;
+                    console.log(`Using voice: ${preferredVoice.name}`);
+                }
+                
+                // Configure speech parameters for better compatibility
+                utterance.rate = 0.8;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0; // Max volume for better capture
+                
+                let hasStarted = false;
+                let timeout = setTimeout(() => {
+                    if (!hasStarted) {
+                        reject(new Error('Speech synthesis timeout'));
+                    }
+                }, 2000);
+                
+                utterance.onstart = () => {
+                    hasStarted = true;
+                    clearTimeout(timeout);
+                    console.log('Speech synthesis started');
+                };
+                
+                utterance.onend = () => {
+                    console.log('Speech synthesis completed');
+                    this.updateStatus('Listening...', 'listening');
+                    resolve();
+                };
+                
+                utterance.onerror = (event) => {
+                    clearTimeout(timeout);
+                    console.error('Speech synthesis error:', event);
+                    this.updateStatus('Speech error', 'error');
+                    reject(new Error(`Speech error: ${event.error}`));
+                };
+                
+                // Try to speak
+                try {
+                    this.synthesis.speak(utterance);
+                } catch (e) {
+                    clearTimeout(timeout);
+                    reject(e);
+                }
+            };
+            
+            // Handle voice loading
+            if (this.synthesis.getVoices().length > 0) {
+                setVoiceAndSpeak();
+            } else {
+                this.synthesis.addEventListener('voiceschanged', setVoiceAndSpeak, { once: true });
+                // Fallback timeout
+                setTimeout(() => {
+                    if (this.synthesis.getVoices().length === 0) {
+                        reject(new Error('No voices available'));
+                    }
+                }, 1000);
+            }
+        });
+    }
+    
+    async tryAudioElement(text) {
+        // This method would use a TTS service to generate audio
+        // For now, we'll simulate it
+        console.log('Would use external TTS service for:', text);
         
-        utterance.onend = () => {
-            this.updateStatus('Listening...', 'listening');
-        };
-        
-        utterance.onerror = (event) => {
-            console.error('Speech synthesis error:', event);
-            this.updateStatus('Speech error', 'error');
-        };
-        
-        this.synthesis.speak(utterance);
+        // Simulate audio playback time
+        return new Promise((resolve) => {
+            const estimatedDuration = text.length * 80; // ~80ms per character
+            setTimeout(() => {
+                this.updateStatus('Listening...', 'listening');
+                resolve();
+            }, Math.min(estimatedDuration, 5000)); // Max 5 seconds
+        });
     }
     
     updateStatus(text, className) {
@@ -294,11 +392,29 @@ class MeetingAI {
             this.statusEl.innerHTML = `<span class="speaking-indicator"></span>${text}`;
         }
     }
+    
+    // Test methods for debugging
+    testSpeech() {
+        console.log('Testing speech synthesis...');
+        this.speak("Hello! This is a test of the AI assistant speech system. Can you hear me in the Zoom meeting?");
+    }
+    
+    testInsight() {
+        console.log('Testing meeting insight...');
+        const insights = [
+            "I'm ready to help with meeting notes and action items.",
+            "Feel free to ask me questions or request meeting summaries.",
+            "I can assist with capturing key decisions and next steps."
+        ];
+        const insight = insights[Math.floor(Math.random() * insights.length)];
+        this.speak(insight);
+    }
 }
 
 // Initialize the AI agent when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new MeetingAI();
+    const agent = new MeetingAI();
+    window.aiAgent = agent; // Make globally accessible for test buttons
 });
 
 // Handle page visibility changes
