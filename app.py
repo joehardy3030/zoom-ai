@@ -48,7 +48,7 @@ def deploy_agent():
     # The webhook URL for Recall.ai to send transcript data to.
     # In production, this must be a publicly accessible URL.
     # For local development, you would use a tool like ngrok.
-    webhook_url = "https://your-public-server-url.com/api/webhook/transcript"
+    webhook_url = "https://936c-198-27-128-96.ngrok-free.app/api/webhook/transcript"
 
     # Create bot with Real-time Transcription enabled
     bot_payload = {
