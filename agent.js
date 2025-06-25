@@ -10,6 +10,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusEl = document.getElementById('status');
     const transcriptEl = document.getElementById('transcript');
 
+    // --- Get the Bot ID from the URL query parameters ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const botId = urlParams.get('bot_id');
+
+    if (!botId) {
+        statusEl.textContent = 'Error: No Bot ID';
+        console.error('Bot ID not found in URL query parameters.');
+        return;
+    }
+
     if (!statusEl || !transcriptEl) {
         console.error('Required HTML elements not found!');
         return;
@@ -33,13 +43,43 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         
         transcriptEl.appendChild(messageEl);
+        // Keep the transcript box scrolled to the bottom
+        transcriptEl.scrollTop = transcriptEl.scrollHeight;
     };
 
     // --- Display initial messages just once ---
     transcriptEl.innerHTML = ''; // Clear previous content
-    addMessage("AI Assistant", "Hello! I am your AI meeting assistant.");
-    addMessage("System", "Ready to observe the meeting.");
+    addMessage("AI Assistant", "Hello! I am now connected to the meeting.");
+    addMessage("System", `Listening for transcript... (Bot ID: ${botId.substring(0, 8)}...)`);
     
+    // --- Poll for transcript updates ---
+    let lastTimestamp = 0;
+    setInterval(async () => {
+        try {
+            const response = await fetch(`/api/bot/${botId}/transcript`);
+            if (!response.ok) {
+                console.error('Failed to fetch transcript:', response.status);
+                return;
+            }
+            
+            const transcriptLines = await response.json();
+            
+            // Filter for new lines that we haven't displayed yet
+            const newLines = transcriptLines.filter(line => line.timestamp > lastTimestamp);
+
+            if (newLines.length > 0) {
+                newLines.forEach(line => {
+                    addMessage(line.speaker, line.text);
+                });
+                // Update the timestamp of the last message we've seen
+                lastTimestamp = newLines[newLines.length - 1].timestamp;
+            }
+
+        } catch (error) {
+            console.error('Error polling for transcript:', error);
+        }
+    }, 2000); // Poll every 2 seconds
+
     console.log('Visual-only agent is stable and ready.');
 });
 
