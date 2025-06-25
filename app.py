@@ -3,12 +3,26 @@ import os
 import requests
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
 RECALL_API_KEY = os.environ.get('RECALL_API_KEY')
-AGENT_URL = os.environ.get('AGENT_URL', 'https://localhost:5000/agent.html')
+RECALL_REGION = os.environ.get('RECALL_REGION', 'us-west-2')
+AGENT_URL = os.environ.get('AGENT_URL', 'https://joehardy3030.github.io/zoom-ai/agent.html')
+
+# Debug: Print loaded configuration (remove in production)
+print(f"Debug: API Key loaded: {'✅ Yes' if RECALL_API_KEY else '❌ No'}")
+print(f"Debug: Region: {RECALL_REGION}")
+print(f"Debug: Agent URL: {AGENT_URL}")
+
+# Construct API URL based on region
+def get_recall_api_base():
+    return f'https://{RECALL_REGION}.recall.ai/api/v1'
 
 @app.route('/')
 def home():
@@ -45,8 +59,9 @@ def deploy_agent():
     }
     
     try:
+        api_base = get_recall_api_base()
         response = requests.post(
-            'https://api.recall.ai/api/v1/bot/',
+            f'{api_base}/bot',  # No trailing slash
             json=bot_payload,
             headers=headers
         )
@@ -56,11 +71,16 @@ def deploy_agent():
             return jsonify({
                 'success': True,
                 'bot_id': bot_data['id'],
-                'message': f'AI agent deployed to meeting successfully!'
+                'bot_data': bot_data,  # Return full bot data
+                'message': f'AI agent deployed to meeting successfully!',
+                'region': RECALL_REGION
             })
         else:
             return jsonify({
-                'error': f'Failed to deploy agent: {response.text}'
+                'error': f'Failed to deploy agent: {response.text}',
+                'region': RECALL_REGION,
+                'api_endpoint': f'{api_base}/bot',
+                'status_code': response.status_code
             }), 400
             
     except Exception as e:
@@ -74,8 +94,9 @@ def bot_status(bot_id):
     }
     
     try:
+        api_base = get_recall_api_base()
         response = requests.get(
-            f'https://api.recall.ai/api/v1/bot/{bot_id}/',
+            f'{api_base}/bot/{bot_id}',  # No trailing slash
             headers=headers
         )
         

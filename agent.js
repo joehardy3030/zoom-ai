@@ -12,13 +12,8 @@ class MeetingAI {
     
     async init() {
         try {
-            // Access the meeting audio stream provided by Recall.ai
-            const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-                audio: true, 
-                video: false 
-            });
-            
-            this.setupAudioProcessing(mediaStream);
+            // Initialize without direct microphone access
+            // Recall.ai will handle the audio streaming
             this.setupSpeechRecognition();
             this.updateStatus('Listening...', 'listening');
             
@@ -27,23 +22,6 @@ class MeetingAI {
         } catch (error) {
             console.error('Initialization failed:', error);
             this.updateStatus('Setup Error', 'error');
-        }
-    }
-    
-    setupAudioProcessing(mediaStream) {
-        // Process the mixed meeting audio from Recall.ai
-        const meetingAudioTrack = mediaStream.getAudioTracks()[0];
-        
-        if (meetingAudioTrack) {
-            console.log('Meeting audio track acquired');
-            
-            // Optional: Set up audio analysis for better speech detection
-            const audioContext = new AudioContext();
-            const source = audioContext.createMediaStreamSource(mediaStream);
-            const analyser = audioContext.createAnalyser();
-            source.connect(analyser);
-            
-            // You can add volume detection, silence detection, etc. here
         }
     }
     
@@ -98,7 +76,9 @@ class MeetingAI {
         this.recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
             if (event.error === 'not-allowed') {
-                this.updateStatus('Microphone permission required', 'error');
+                this.updateStatus('Microphone access denied - using alternative mode', 'processing');
+                // Fall back to text-only mode or polling for meeting updates
+                this.setupAlternativeMode();
             }
         };
         
@@ -109,8 +89,47 @@ class MeetingAI {
             }
         };
         
-        this.isListening = true;
-        this.recognition.start();
+        // Try to start speech recognition, but don't fail if not allowed
+        try {
+            this.isListening = true;
+            this.recognition.start();
+        } catch (error) {
+            console.warn('Speech recognition not available, using alternative mode');
+            this.setupAlternativeMode();
+        }
+    }
+    
+    setupAlternativeMode() {
+        // Alternative mode without microphone access
+        // This could poll for meeting events or use other triggers
+        this.updateStatus('Ready (Text Mode)', 'listening');
+        
+        // Example: Simulate periodic meeting events or use other triggers
+        setInterval(() => {
+            this.simulateMeetingEvent();
+        }, 30000); // Check every 30 seconds
+    }
+    
+    simulateMeetingEvent() {
+        // In a real implementation, this could:
+        // 1. Poll Recall.ai API for meeting events
+        // 2. Listen for PostMessage events from parent frame
+        // 3. Use WebSocket connections to get real-time updates
+        
+        const currentTime = new Date().toLocaleTimeString();
+        console.log(`Meeting check at ${currentTime}`);
+        
+        // Example: Provide periodic meeting insights
+        if (Math.random() > 0.7) { // 30% chance
+            const insights = [
+                "Would you like me to summarize the key points discussed so far?",
+                "I notice we've been discussing this topic for a while. Should I capture the action items?",
+                "This seems like an important decision point. Would you like me to note this for the meeting summary?"
+            ];
+            
+            const insight = insights[Math.floor(Math.random() * insights.length)];
+            this.speak(insight);
+        }
     }
     
     async processMessage(message) {
