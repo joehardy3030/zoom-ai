@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
         debugEl.style.backgroundColor = 'rgba(0,0,0,0.7)';
         debugEl.style.color = '#00ff00';
         debugEl.style.padding = '5px';
-        debugEl.style.fontSize = '10px';
+        debugEl.style.fontSize = '16px';
         debugEl.style.fontFamily = 'monospace';
         debugEl.style.zIndex = '9999';
         
