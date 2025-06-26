@@ -6,6 +6,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import threading
 import time
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -188,16 +189,41 @@ def transcript_webhook():
     return jsonify({'status': 'received'}), 200
 
 
-@app.route('/api/bot/<bot_id>/transcript')
+@app.route('/api/bot/<bot_id>/transcript', methods=['GET'])
 def get_transcript(bot_id):
     """
-    Provides the latest transcript data to the agent frontend.
+    Returns the transcript for a specific bot
     """
-    with transcript_lock:
-        transcript_lines = transcript_data_store.get(bot_id, [])
+    # Check if JSONP format is requested
+    callback = request.args.get('callback')
     
-    return jsonify(transcript_lines)
+    # Safely access transcript data with threading lock
+    with transcript_lock:
+        if bot_id in transcript_data_store:
+            response_data = transcript_data_store[bot_id]
+        else:
+            response_data = []
+    
+    # Debug: print what we're returning
+    print(f"Serving transcript for Bot {bot_id}: {len(response_data)} lines")
+    
+    # If this is a JSONP request, wrap the response in the callback function
+    if callback:
+        json_data = json.dumps(response_data)
+        return f"{callback}({json_data})", 200, {'Content-Type': 'application/javascript'}
+    else:
+        return jsonify(response_data)
 
+@app.route('/api/ping', methods=['GET'])
+def ping():
+    """Simple ping endpoint that can work with image tags"""
+    print("Ping received!")
+    response = app.make_response('OK')
+    response.headers['Content-Type'] = 'image/gif'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 if __name__ == '__main__':
     # Note: For local development, you'll need to use a tool like ngrok
