@@ -54,14 +54,88 @@ document.addEventListener('DOMContentLoaded', () => {
         debugEl.style.fontSize = '10px';
         debugEl.style.fontFamily = 'monospace';
         debugEl.style.zIndex = '9999';
+        
+        // Get resolution and viewport information
+        const screenInfo = {
+            screenWidth: screen.width,
+            screenHeight: screen.height,
+            screenAvailWidth: screen.availWidth,
+            screenAvailHeight: screen.availHeight,
+            windowInnerWidth: window.innerWidth,
+            windowInnerHeight: window.innerHeight,
+            windowOuterWidth: window.outerWidth,
+            windowOuterHeight: window.outerHeight,
+            devicePixelRatio: window.devicePixelRatio || 1,
+            userAgent: navigator.userAgent.substring(0, 50) + '...'
+        };
+        
         debugEl.innerHTML = `
             Bot ID: ${botId || 'MISSING'}<br>
-            Backend: ${backendUrl.substring(0, 30)}...
+            Backend: ${backendUrl.substring(0, 30)}...<br>
+            Screen: ${screenInfo.screenWidth}x${screenInfo.screenHeight}<br>
+            Available: ${screenInfo.screenAvailWidth}x${screenInfo.screenAvailHeight}<br>
+            Window: ${screenInfo.windowInnerWidth}x${screenInfo.windowInnerHeight}<br>
+            Outer: ${screenInfo.windowOuterWidth}x${screenInfo.windowOuterHeight}<br>
+            Pixel Ratio: ${screenInfo.devicePixelRatio}<br>
+            User Agent: ${screenInfo.userAgent}
         `;
         document.body.appendChild(debugEl);
+        
+        // Also log to console for debugging
+        console.log('=== RESOLUTION DEBUG INFO ===');
+        console.log('Screen dimensions:', screenInfo);
+        console.log('Full User Agent:', navigator.userAgent);
+        
+        // Check if we're in a headless environment
+        const isHeadless = !window.chrome || !window.chrome.webstore;
+        console.log('Headless environment detected:', isHeadless);
+        
+        // Log any CSS media queries that might be affecting rendering
+        const mediaQueries = window.matchMedia('(max-width: 768px)');
+        console.log('Mobile media query match:', mediaQueries.matches);
     };
     
     addDebugInfo();
+
+    // Function to update resolution info periodically
+    const updateResolutionInfo = () => {
+        const debugEl = document.querySelector('div[style*="position: absolute"][style*="bottom: 10px"]');
+        if (debugEl) {
+            const screenInfo = {
+                screenWidth: screen.width,
+                screenHeight: screen.height,
+                screenAvailWidth: screen.availWidth,
+                screenAvailHeight: screen.availHeight,
+                windowInnerWidth: window.innerWidth,
+                windowInnerHeight: window.innerHeight,
+                windowOuterWidth: window.outerWidth,
+                windowOuterHeight: window.outerHeight,
+                devicePixelRatio: window.devicePixelRatio || 1,
+                userAgent: navigator.userAgent.substring(0, 50) + '...'
+            };
+            
+            debugEl.innerHTML = `
+                Bot ID: ${botId || 'MISSING'}<br>
+                Backend: ${backendUrl.substring(0, 30)}...<br>
+                Screen: ${screenInfo.screenWidth}x${screenInfo.screenHeight}<br>
+                Available: ${screenInfo.screenAvailWidth}x${screenInfo.screenAvailHeight}<br>
+                Window: ${screenInfo.windowInnerWidth}x${screenInfo.windowInnerHeight}<br>
+                Outer: ${screenInfo.windowOuterWidth}x${screenInfo.windowOuterHeight}<br>
+                Pixel Ratio: ${screenInfo.devicePixelRatio}<br>
+                User Agent: ${screenInfo.userAgent}<br>
+                Time: ${new Date().toLocaleTimeString()}
+            `;
+        }
+    };
+
+    // Update resolution info every 5 seconds
+    setInterval(updateResolutionInfo, 5000);
+
+    // Listen for window resize events
+    window.addEventListener('resize', () => {
+        console.log('Window resized:', window.innerWidth, 'x', window.innerHeight);
+        updateResolutionInfo();
+    });
 
     if (!botId) {
         statusEl.textContent = 'Error: No Bot ID';
