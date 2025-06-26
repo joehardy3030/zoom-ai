@@ -194,25 +194,54 @@ def get_transcript(bot_id):
     """
     Returns the transcript for a specific bot
     """
+    print(f"Transcript requested for Bot ID: '{bot_id}'")
     # Check if JSONP format is requested
     callback = request.args.get('callback')
     
-    # Safely access transcript data with threading lock
+    # Debug: Show all available bot IDs in transcript store
+    available_bots = list(transcript_data_store.keys())
+    print(f"Available bot IDs: {available_bots}")
+    
+    # Safely access transcript data with lock
     with transcript_lock:
         if bot_id in transcript_data_store:
-            response_data = transcript_data_store[bot_id]
+            response_data = list(transcript_data_store[bot_id])  # Make a copy to avoid race conditions
         else:
-            response_data = []
+            # Try to find if there's a partial match (in case of encoding issues)
+            matching_ids = [id for id in transcript_data_store.keys() if id.startswith(bot_id[:8]) or id.endswith(bot_id[-8:])]
+            if matching_ids:
+                print(f"Found partial match for requested bot '{bot_id}': {matching_ids[0]}")
+                response_data = list(transcript_data_store[matching_ids[0]])
+            else:
+                print(f"No matching bot ID found")
+                response_data = []
     
     # Debug: print what we're returning
-    print(f"Serving transcript for Bot {bot_id}: {len(response_data)} lines")
+    print(f"Serving transcript for Bot '{bot_id}': {len(response_data)} lines")
     
     # If this is a JSONP request, wrap the response in the callback function
     if callback:
         json_data = json.dumps(response_data)
-        return f"{callback}({json_data})", 200, {'Content-Type': 'application/javascript'}
+        print(f"Returning JSONP response with callback: {callback}")
+        return f"{callback}({json_data});", 200, {'Content-Type': 'application/javascript'}
     else:
-        return jsonify(response_data)
+        # Add debugging headers to see in browser console
+        response = jsonify(response_data)
+        response.headers['X-Debug-Lines'] = str(len(response_data))
+        return response
+
+@app.route('/api/bots', methods=['GET'])
+def list_bots():
+    """List all bot IDs with transcript data"""
+    with transcript_lock:
+        bots = {}
+        for bot_id, lines in transcript_data_store.items():
+            bots[bot_id] = len(lines)
+    
+    return jsonify({
+        "active_bots": bots,
+        "count": len(bots)
+    })
 
 @app.route('/api/ping', methods=['GET'])
 def ping():
