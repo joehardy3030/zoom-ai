@@ -1,4 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
+    fetch(`${backendUrl}/api/webhook/transcript`)
+    .then(response => console.log('Simple test fetch status:', response.status))
+    .catch(error => console.error('Simple test fetch failed:', error));
+    
     // This guard ensures the script only runs ONCE.
     if (window.agentInitialized) {
         console.log('Agent already initialized. Aborting.');

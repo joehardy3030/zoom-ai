@@ -11,7 +11,8 @@ import time
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+# Configure CORS to allow requests from any origin - needed for recall.ai/Zoom integration
+CORS(app, resources={r"/*": {"origins": "*", "allow_headers": "*", "expose_headers": "*"}})
 
 RECALL_API_KEY = os.environ.get('RECALL_API_KEY')
 RECALL_REGION = os.environ.get('RECALL_REGION', 'us-west-2')
