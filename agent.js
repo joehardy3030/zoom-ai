@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const botId = urlParams.get('bot_id');
     
     // --- Get the Backend URL from URL parameters or use a default ---
-    const backendUrl = urlParams.get('backend_url') || 'https://717e-198-27-128-96.ngrok-free.app';
+    const backendUrl = urlParams.get('backend_url') || 'https://75c8-198-27-128-96.ngrok-free.app';
     
     // Mark the agent as initialized now that we have all the parameters
     window.agentInitialized = true;
