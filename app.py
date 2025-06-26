@@ -80,7 +80,8 @@ def deploy_agent():
             "camera": {
                 "kind": "webpage",
                 "config": {
-                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={backend_url}", # Pass bot_id and backend_url to agent
+                    # Use proper template format for recall.ai - single braces for BOT_ID and URL encode the backend_url
+                    "url": f"{AGENT_URL}?bot_id={'{BOT_ID}'}&backend_url={requests.utils.quote(backend_url)}",
                     "width": 1280,
                     "height": 720
                 }
