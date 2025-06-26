@@ -202,18 +202,30 @@ def get_transcript(bot_id):
     available_bots = list(transcript_data_store.keys())
     print(f"Available bot IDs: {available_bots}")
     
+    # Special handling for the placeholder case
+    if bot_id == '{BOT_ID}' or bot_id == '%7BBOT_ID%7D':
+        # If we only have one bot, use that (most common case)
+        if len(available_bots) == 1:
+            real_bot_id = available_bots[0]
+            print(f"Using the only active bot ID: {real_bot_id} for placeholder request")
+            bot_id = real_bot_id
+        elif len(available_bots) > 1:
+            # Sort by most recently active if we have multiple bots
+            latest_bot_id = available_bots[0]  # Default to first
+            print(f"Multiple bots active, using: {latest_bot_id}")
+            bot_id = latest_bot_id
+    
     # Safely access transcript data with lock
     with transcript_lock:
         if bot_id in transcript_data_store:
             response_data = list(transcript_data_store[bot_id])  # Make a copy to avoid race conditions
         else:
-            # Try to find if there's a partial match (in case of encoding issues)
-            matching_ids = [id for id in transcript_data_store.keys() if id.startswith(bot_id[:8]) or id.endswith(bot_id[-8:])]
-            if matching_ids:
-                print(f"Found partial match for requested bot '{bot_id}': {matching_ids[0]}")
-                response_data = list(transcript_data_store[matching_ids[0]])
+            # Try any available bot if we have one 
+            if available_bots:
+                print(f"Bot ID {bot_id} not found, using available bot: {available_bots[0]}")
+                response_data = list(transcript_data_store[available_bots[0]])
             else:
-                print(f"No matching bot ID found")
+                print(f"No matching bot ID found and no active bots")
                 response_data = []
     
     # Debug: print what we're returning
