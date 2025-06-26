@@ -50,10 +50,11 @@ document.addEventListener('DOMContentLoaded', () => {
         debugEl.style.left = '10px';
         debugEl.style.backgroundColor = 'rgba(0,0,0,0.7)';
         debugEl.style.color = '#00ff00';
-        debugEl.style.padding = '5px';
-        debugEl.style.fontSize = '16px';
+        debugEl.style.padding = '10px';
+        debugEl.style.fontSize = '20px';
         debugEl.style.fontFamily = 'monospace';
         debugEl.style.zIndex = '9999';
+        debugEl.style.lineHeight = '1.4';
         
         // Get resolution and viewport information
         const screenInfo = {
