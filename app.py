@@ -32,6 +32,11 @@ transcript_lock = threading.Lock()
 def get_recall_api_base():
     return f'https://{RECALL_REGION}.recall.ai/api/v1'
 
+# Get our backend URL (the ngrok URL)
+def get_backend_url():
+    # This needs to be updated whenever ngrok changes
+    return request.host_url.rstrip('/')
+
 @app.route('/')
 def home():
     return render_template('dashboard.html')
@@ -48,7 +53,10 @@ def deploy_agent():
     # The webhook URL for Recall.ai to send transcript data to.
     # In production, this must be a publicly accessible URL.
     # For local development, you would use a tool like ngrok.
-    webhook_url = "https://73a6-198-27-128-96.ngrok-free.app/api/webhook/transcript"
+    webhook_url = request.host_url.rstrip('/') + "/api/webhook/transcript"
+    
+    # Get our backend URL for the agent to use
+    backend_url = get_backend_url()
 
     # Create bot with Real-time Transcription enabled
     bot_payload = {
@@ -72,7 +80,7 @@ def deploy_agent():
             "camera": {
                 "kind": "webpage",
                 "config": {
-                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}", # Pass bot_id to agent
+                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={backend_url}", # Pass bot_id and backend_url to agent
                     "width": 1280,
                     "height": 720
                 }

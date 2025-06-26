@@ -13,6 +13,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Get the Bot ID from the URL query parameters ---
     const urlParams = new URLSearchParams(window.location.search);
     const botId = urlParams.get('bot_id');
+    
+    // --- Get the Backend URL from URL parameters or use a default ---
+    const backendUrl = urlParams.get('backend_url') || 'https://73a6-198-27-128-96.ngrok-free.app';
+    console.log(`Using backend URL: ${backendUrl}`);
 
     if (!botId) {
         statusEl.textContent = 'Error: No Bot ID';
@@ -56,7 +60,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastTimestamp = 0;
     setInterval(async () => {
         try {
-            const response = await fetch(`/api/bot/${botId}/transcript`);
+            // Use the absolute URL to the backend instead of a relative URL
+            const response = await fetch(`${backendUrl}/api/bot/${botId}/transcript`);
             if (!response.ok) {
                 console.error('Failed to fetch transcript:', response.status);
                 return;
@@ -91,4 +96,4 @@ window.addEventListener('load', () => {
 // Handle page visibility changes
 document.addEventListener('visibilitychange', () => {
     console.log(`Page visibility: ${document.hidden ? 'hidden' : 'visible'}`);
-}); 
+});
