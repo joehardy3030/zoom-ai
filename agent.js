@@ -16,7 +16,38 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Get the Backend URL from URL parameters or use a default ---
     const backendUrl = urlParams.get('backend_url') || 'https://717e-198-27-128-96.ngrok-free.app';
-    console.log(`Using backend URL: ${backendUrl}`);
+    
+    // Enhanced debugging output
+    console.log('=== AGENT DEBUGGING ===');
+    console.log(`Full URL: ${window.location.href}`);
+    console.log(`Query string: ${window.location.search}`);
+    console.log(`Bot ID: ${botId}`);
+    console.log(`Backend URL: ${backendUrl}`);
+    console.log('All URL Parameters:');
+    for (const [key, value] of urlParams.entries()) {
+        console.log(`- ${key}: ${value}`);
+    }
+    
+    // Display debug info on the page too for visibility in Zoom
+    const addDebugInfo = () => {
+        const debugEl = document.createElement('div');
+        debugEl.style.position = 'absolute';
+        debugEl.style.bottom = '10px';
+        debugEl.style.left = '10px';
+        debugEl.style.backgroundColor = 'rgba(0,0,0,0.7)';
+        debugEl.style.color = '#00ff00';
+        debugEl.style.padding = '5px';
+        debugEl.style.fontSize = '10px';
+        debugEl.style.fontFamily = 'monospace';
+        debugEl.style.zIndex = '9999';
+        debugEl.innerHTML = `
+            Bot ID: ${botId || 'MISSING'}<br>
+            Backend: ${backendUrl.substring(0, 30)}...
+        `;
+        document.body.appendChild(debugEl);
+    };
+    
+    addDebugInfo();
 
     if (!botId) {
         statusEl.textContent = 'Error: No Bot ID';
@@ -58,19 +89,43 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Poll for transcript updates ---
     let lastTimestamp = 0;
+    let errorCount = 0;
+    const maxErrors = 5;
+    
     setInterval(async () => {
         try {
             // Use the absolute URL to the backend instead of a relative URL
-            const response = await fetch(`${backendUrl}/api/bot/${botId}/transcript`);
+            const fetchUrl = `${backendUrl}/api/bot/${botId}/transcript`;
+            console.log(`Fetching transcript from: ${fetchUrl}`);
+            
+            statusEl.textContent = `Polling... (${new Date().toLocaleTimeString()})`;
+            
+            const response = await fetch(fetchUrl);
+            
             if (!response.ok) {
-                console.error('Failed to fetch transcript:', response.status);
+                errorCount++;
+                console.error(`Failed to fetch transcript [${errorCount}/${maxErrors}]:`, response.status);
+                statusEl.textContent = `Error: ${response.status} (Attempt ${errorCount})`;
+                
+                // If too many errors, try fallback mechanism
+                if (errorCount >= maxErrors) {
+                    const fallbackUrl = 'https://717e-198-27-128-96.ngrok-free.app';
+                    console.log(`Too many errors, trying fallback URL: ${fallbackUrl}`);
+                    addMessage("System", "Connection issues - trying fallback...");
+                }
                 return;
             }
             
+            // Reset error count on successful fetch
+            errorCount = 0;
+            statusEl.textContent = 'Connected';
+            
             const transcriptLines = await response.json();
+            console.log(`Received ${transcriptLines.length} lines:`, transcriptLines);
             
             // Filter for new lines that we haven't displayed yet
             const newLines = transcriptLines.filter(line => line.timestamp > lastTimestamp);
+            console.log(`Found ${newLines.length} new lines`);
 
             if (newLines.length > 0) {
                 newLines.forEach(line => {
@@ -81,7 +136,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } catch (error) {
-            console.error('Error polling for transcript:', error);
+            errorCount++;
+            console.error(`Error polling for transcript [${errorCount}/${maxErrors}]:`, error);
+            statusEl.textContent = `Error: ${error.message} (Attempt ${errorCount})`;
         }
     }, 2000); // Poll every 2 seconds
 
