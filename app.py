@@ -18,6 +18,7 @@ CORS(app, resources={r"/*": {"origins": "*", "allow_headers": "*", "expose_heade
 RECALL_API_KEY = os.environ.get('RECALL_API_KEY')
 RECALL_REGION = os.environ.get('RECALL_REGION', 'us-west-2')
 AGENT_URL = os.environ.get('AGENT_URL', 'https://joehardy3030.github.io/zoom-ai/agent.html')
+BACKEND_URL = os.environ.get('BACKEND_URL', 'https://your-ngrok-url-here.ngrok-free.app')
 
 # Debug: Print loaded configuration (remove in production)
 print(f"Debug: API Key loaded: {'✅ Yes' if RECALL_API_KEY else '❌ No'}")
@@ -55,10 +56,10 @@ def deploy_agent():
     # The webhook URL for Recall.ai to send transcript data to.
     # In production, this must be a publicly accessible URL.
     # For local development, you would use a tool like ngrok.
-    webhook_url = request.host_url.rstrip('/') + "/api/webhook/transcript"
+    webhook_url = BACKEND_URL + "/api/webhook/transcript"
     
     # Get our backend URL for the agent to use
-    backend_url = get_backend_url()
+    backend_url = BACKEND_URL
 
     # Create bot with Real-time Transcription enabled
     bot_payload = {

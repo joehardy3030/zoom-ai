@@ -25,7 +25,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const botId = urlParams.get('bot_id');
     
     // --- Get the Backend URL from URL parameters or use a default ---
-    const backendUrl = urlParams.get('backend_url') || 'https://75c8-198-27-128-96.ngrok-free.app';
+    const backendUrl = urlParams.get('backend_url');
+    
+    if (!backendUrl) {
+        statusEl.textContent = 'Error: No Backend URL';
+        transcriptEl.innerHTML = '<div style="color:red">Error: Missing Backend URL in URL parameters</div>';
+        console.error('Backend URL not found in URL query parameters.');
+        return;
+    }
     
     // Mark the agent as initialized now that we have all the parameters
     window.agentInitialized = true;
@@ -147,6 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Helper function to add messages ---
     const addMessage = (sender, message) => {
+        console.log(`addMessage called with sender: "${sender}", message: "${message}"`);
+        
         const messageEl = document.createElement('div');
         messageEl.style.marginBottom = '10px';
         messageEl.style.padding = '10px';
@@ -159,9 +168,18 @@ document.addEventListener('DOMContentLoaded', () => {
             <div style="color: #ffffff; line-height: 1.4;">${message}</div>
         `;
         
+        console.log('Created message element:', messageEl);
+        console.log('Transcript element exists:', !!transcriptEl);
+        console.log('Transcript element children before:', transcriptEl.children.length);
+        
         transcriptEl.appendChild(messageEl);
+        
+        console.log('Transcript element children after:', transcriptEl.children.length);
+        
         // Keep the transcript box scrolled to the bottom
         transcriptEl.scrollTop = transcriptEl.scrollHeight;
+        
+        console.log('Message added successfully');
     };
 
     // --- Display initial messages just once ---
@@ -259,12 +277,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const processTranscript = (transcriptLines) => {
         console.log(`Received ${transcriptLines.length} lines:`, transcriptLines);
         
+        // Debug: Check if transcriptLines is valid
+        if (!Array.isArray(transcriptLines)) {
+            console.error('transcriptLines is not an array:', typeof transcriptLines, transcriptLines);
+            statusEl.textContent = 'Error: Invalid transcript data format';
+            return;
+        }
+        
+        if (transcriptLines.length === 0) {
+            console.log('No transcript lines received');
+            statusEl.textContent = 'Connected - No transcript data yet';
+            return;
+        }
+        
+        // Debug: Show first few lines structure
+        console.log('First transcript line structure:', transcriptLines[0]);
+        
         // Filter for new lines that we haven't displayed yet
-        const newLines = transcriptLines.filter(line => line.timestamp > lastTimestamp);
+        const newLines = transcriptLines.filter(line => {
+            // Debug: Check line structure
+            if (!line || typeof line !== 'object') {
+                console.error('Invalid line structure:', line);
+                return false;
+            }
+            
+            // Check if line has required properties
+            if (!line.timestamp || !line.speaker || !line.text) {
+                console.error('Line missing required properties:', line);
+                return false;
+            }
+            
+            return line.timestamp > lastTimestamp;
+        });
+        
         console.log(`Found ${newLines.length} new lines`);
 
         if (newLines.length > 0) {
+            console.log('Processing new lines:', newLines);
             newLines.forEach(line => {
+                console.log(`Adding message from ${line.speaker}: ${line.text}`);
                 addMessage(line.speaker, line.text);
             });
             // Update the timestamp of the last message we've seen
@@ -272,6 +323,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Ensure we show "connected" status
             statusEl.textContent = 'Connected - Transcript updated';
+        } else {
+            console.log('No new lines to display');
         }
     };
     
