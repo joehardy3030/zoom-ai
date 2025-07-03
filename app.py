@@ -1,7 +1,7 @@
 # app.py - Flask backend
 import os
 import requests
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 import threading
@@ -25,11 +25,13 @@ print(f"Debug: API Key loaded: {'✅ Yes' if RECALL_API_KEY else '❌ No'}")
 print(f"Debug: Region: {RECALL_REGION}")
 print(f"Debug: Agent URL: {AGENT_URL}")
 
-# --- In-memory storage for transcripts (for demonstration) ---
+# --- In-memory storage for transcripts and audio commands ---
 # In production, you would use a database like Redis or PostgreSQL.
 transcript_data_store = {}
+audio_commands_store = {}  # Store audio commands for each bot
 # A lock to ensure thread-safe access to the data store
 transcript_lock = threading.Lock()
+audio_lock = threading.Lock()
 
 # Construct API URL based on region
 def get_recall_api_base():
@@ -266,6 +268,84 @@ def ping():
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     return response
+
+# Audio functionality
+@app.route('/audio/<filename>')
+def serve_audio(filename):
+    """Serve audio files from the audio directory"""
+    return send_from_directory('audio', filename)
+
+@app.route('/api/bot/<bot_id>/play-audio', methods=['POST'])
+def play_audio(bot_id):
+    """Store a play audio command for a specific bot"""
+    data = request.get_json()
+    audio_file = data.get('audio_file', 'ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3')
+    
+    print(f"Play audio command received for Bot {bot_id}: {audio_file}")
+    
+    with audio_lock:
+        if bot_id not in audio_commands_store:
+            audio_commands_store[bot_id] = []
+        
+        # Add play command
+        audio_commands_store[bot_id].append({
+            "command": "play",
+            "audio_file": audio_file,
+            "timestamp": time.time()
+        })
+        
+        # Keep only the last 10 commands
+        audio_commands_store[bot_id] = audio_commands_store[bot_id][-10:]
+    
+    return jsonify({"status": "play command sent", "audio_file": audio_file})
+
+@app.route('/api/bot/<bot_id>/stop-audio', methods=['POST'])
+def stop_audio(bot_id):
+    """Store a stop audio command for a specific bot"""
+    print(f"Stop audio command received for Bot {bot_id}")
+    
+    with audio_lock:
+        if bot_id not in audio_commands_store:
+            audio_commands_store[bot_id] = []
+        
+        # Add stop command
+        audio_commands_store[bot_id].append({
+            "command": "stop",
+            "timestamp": time.time()
+        })
+        
+        # Keep only the last 10 commands
+        audio_commands_store[bot_id] = audio_commands_store[bot_id][-10:]
+    
+    return jsonify({"status": "stop command sent"})
+
+@app.route('/api/bot/<bot_id>/audio-command', methods=['GET'])
+def get_audio_command(bot_id):
+    """Get pending audio commands for a specific bot"""
+    print(f"Audio command requested for Bot ID: '{bot_id}'")
+    
+    # Handle placeholder bot ID like we do for transcripts
+    available_bots = list(audio_commands_store.keys())
+    
+    if bot_id == '{BOT_ID}' or bot_id == '%7BBOT_ID%7D':
+        if len(available_bots) == 1:
+            real_bot_id = available_bots[0]
+            print(f"Using the only active bot ID: {real_bot_id} for audio command request")
+            bot_id = real_bot_id
+        elif len(available_bots) > 1:
+            latest_bot_id = available_bots[0]
+            print(f"Multiple bots active, using: {latest_bot_id}")
+            bot_id = latest_bot_id
+    
+    with audio_lock:
+        if bot_id in audio_commands_store and audio_commands_store[bot_id]:
+            # Return the most recent command and remove it
+            command = audio_commands_store[bot_id].pop()
+            print(f"Serving audio command for Bot '{bot_id}': {command}")
+            return jsonify(command)
+        else:
+            # No commands pending
+            return jsonify({"command": "none"})
 
 if __name__ == '__main__':
     # Note: For local development, you'll need to use a tool like ngrok

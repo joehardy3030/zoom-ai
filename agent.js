@@ -328,13 +328,116 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
+    // --- Audio functionality ---
+    let currentAudio = null;
+    let audioStatus = 'idle'; // 'idle', 'playing', 'loading'
+    
+    const playAudioFile = async (audioFile) => {
+        console.log(`Playing audio file: ${audioFile}`);
+        
+        try {
+            // Stop any currently playing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+            
+            audioStatus = 'loading';
+            addMessage("System", `Loading audio: ${audioFile}`);
+            
+            // Create new audio element
+            currentAudio = new Audio(`${backendUrl}/audio/${audioFile}`);
+            
+            // Set up audio event handlers
+            currentAudio.addEventListener('loadstart', () => {
+                console.log('Audio loading started');
+                addMessage("System", "Audio loading...");
+            });
+            
+            currentAudio.addEventListener('canplay', () => {
+                console.log('Audio can start playing');
+                audioStatus = 'playing';
+                addMessage("System", "🎵 Audio playing");
+            });
+            
+            currentAudio.addEventListener('ended', () => {
+                console.log('Audio playback ended');
+                audioStatus = 'idle';
+                addMessage("System", "Audio playback finished");
+                currentAudio = null;
+            });
+            
+            currentAudio.addEventListener('error', (e) => {
+                console.error('Audio error:', e);
+                audioStatus = 'idle';
+                addMessage("System", `Audio error: ${e.message || 'Unknown error'}`);
+                currentAudio = null;
+            });
+            
+            // Set volume and play
+            currentAudio.volume = 1.0; // Max volume
+            await currentAudio.play();
+            
+        } catch (error) {
+            console.error('Error playing audio:', error);
+            audioStatus = 'idle';
+            addMessage("System", `Audio play error: ${error.message}`);
+            currentAudio = null;
+        }
+    };
+    
+    const stopAudio = () => {
+        console.log('Stopping audio');
+        
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+            audioStatus = 'idle';
+            addMessage("System", "⏹️ Audio stopped");
+        } else {
+            console.log('No audio to stop');
+            addMessage("System", "No audio playing");
+        }
+    };
+    
+    // Poll for audio commands
+    const pollAudioCommands = async () => {
+        try {
+            const response = await fetch(`${backendUrl}/api/bot/${botId}/audio-command`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                cache: 'no-cache'
+            });
+            
+            if (response.ok) {
+                const command = await response.json();
+                console.log('Audio command received:', command);
+                
+                if (command.command === 'play' && command.audio_file) {
+                    await playAudioFile(command.audio_file);
+                } else if (command.command === 'stop') {
+                    stopAudio();
+                }
+                // 'none' command means no pending commands, do nothing
+            } else {
+                console.log('Audio command poll failed:', response.status);
+            }
+        } catch (error) {
+            console.error('Error polling audio commands:', error);
+        }
+    };
+    
     // Let's try once immediately
     setTimeout(fetchTranscript, 500);
     
-    // Then poll every 2 seconds
+    // Then poll every 2 seconds for both transcript and audio commands
     setInterval(fetchTranscript, 2000);
+    setInterval(pollAudioCommands, 2000);
 
-    console.log('Visual-only agent is running.');
+    console.log('Visual-only agent is running with audio support.');
 });
 
 // Handle page visibility changes

@@ -83,6 +83,26 @@
             <button type="submit" id="deployBtn">Deploy AI Agent</button>
         </form>
         
+        <!-- Audio Controls -->
+        <div id="audioControls" style="margin-top: 30px; padding-top: 30px; border-top: 2px solid #e5e7eb; display: none;">
+            <h2>🎵 Audio Controls</h2>
+            <p>Control audio playback for Bot ID: <span id="currentBotId">None</span></p>
+            
+            <div class="form-group">
+                <label for="botIdInput">Bot ID:</label>
+                <input 
+                    type="text" 
+                    id="botIdInput" 
+                    placeholder="Enter bot ID for audio control"
+                >
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="playAudioBtn" onclick="playAudio()">🎵 Play Audio</button>
+                <button id="stopAudioBtn" onclick="stopAudio()">⏹️ Stop Audio</button>
+            </div>
+        </div>
+        
         <div id="status" class="status"></div>
     </div>
 
@@ -117,6 +137,11 @@
                     statusDiv.className = 'status success';
                     statusDiv.textContent = `✅ ${result.message} Bot ID: ${result.bot_id}`;
                     statusDiv.style.display = 'block';
+                    
+                    // Show audio controls and set bot ID
+                    document.getElementById('audioControls').style.display = 'block';
+                    document.getElementById('currentBotId').textContent = result.bot_id;
+                    document.getElementById('botIdInput').value = result.bot_id;
                 } else {
                     throw new Error(result.error);
                 }
@@ -130,6 +155,84 @@
                 deployBtn.textContent = 'Deploy AI Agent';
             }
         });
+        
+        // Audio control functions
+        async function playAudio() {
+            const botId = document.getElementById('botIdInput').value;
+            if (!botId) {
+                alert('Please enter a Bot ID');
+                return;
+            }
+            
+            const playBtn = document.getElementById('playAudioBtn');
+            playBtn.disabled = true;
+            playBtn.textContent = 'Sending...';
+            
+            try {
+                const response = await fetch(`/api/bot/${botId}/play-audio`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        audio_file: 'ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3'
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('Play audio response:', result);
+                
+                // Show temporary success message
+                const originalText = playBtn.textContent;
+                playBtn.textContent = '✅ Sent!';
+                setTimeout(() => {
+                    playBtn.textContent = '🎵 Play Audio';
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Error playing audio:', error);
+                alert('Error sending play command');
+            } finally {
+                playBtn.disabled = false;
+            }
+        }
+        
+        async function stopAudio() {
+            const botId = document.getElementById('botIdInput').value;
+            if (!botId) {
+                alert('Please enter a Bot ID');
+                return;
+            }
+            
+            const stopBtn = document.getElementById('stopAudioBtn');
+            stopBtn.disabled = true;
+            stopBtn.textContent = 'Sending...';
+            
+            try {
+                const response = await fetch(`/api/bot/${botId}/stop-audio`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                console.log('Stop audio response:', result);
+                
+                // Show temporary success message
+                const originalText = stopBtn.textContent;
+                stopBtn.textContent = '✅ Sent!';
+                setTimeout(() => {
+                    stopBtn.textContent = '⏹️ Stop Audio';
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Error stopping audio:', error);
+                alert('Error sending stop command');
+            } finally {
+                stopBtn.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>
