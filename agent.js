@@ -345,8 +345,12 @@ document.addEventListener('DOMContentLoaded', () => {
             audioStatus = 'loading';
             addMessage("System", `Loading audio: ${audioFile}`);
             
-            // Create new audio element
+            // Create new audio element with better buffering settings
             currentAudio = new Audio(`${backendUrl}/audio/${audioFile}`);
+            
+            // Configure audio for better streaming
+            currentAudio.preload = 'auto';  // Preload the entire file
+            currentAudio.crossOrigin = 'anonymous';  // Handle CORS
             
             // Set up audio event handlers
             currentAudio.addEventListener('loadstart', () => {
@@ -354,10 +358,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 addMessage("System", "Audio loading...");
             });
             
+            currentAudio.addEventListener('loadedmetadata', () => {
+                console.log('Audio metadata loaded');
+                addMessage("System", `Audio duration: ${Math.round(currentAudio.duration)}s`);
+            });
+            
+            currentAudio.addEventListener('loadeddata', () => {
+                console.log('Audio data loaded');
+            });
+            
             currentAudio.addEventListener('canplay', () => {
                 console.log('Audio can start playing');
                 audioStatus = 'playing';
+                addMessage("System", "🎵 Audio ready to play");
+            });
+            
+            currentAudio.addEventListener('canplaythrough', () => {
+                console.log('Audio can play through without buffering');
+                addMessage("System", "🎵 Audio fully buffered and playing");
+            });
+            
+            currentAudio.addEventListener('playing', () => {
+                console.log('Audio is playing');
+                audioStatus = 'playing';
                 addMessage("System", "🎵 Audio playing");
+            });
+            
+            currentAudio.addEventListener('waiting', () => {
+                console.log('Audio is waiting for data');
+                addMessage("System", "⏳ Audio buffering...");
+            });
+            
+            currentAudio.addEventListener('stalled', () => {
+                console.log('Audio download stalled');
+                addMessage("System", "⚠️ Audio download stalled");
             });
             
             currentAudio.addEventListener('ended', () => {
@@ -370,13 +404,35 @@ document.addEventListener('DOMContentLoaded', () => {
             currentAudio.addEventListener('error', (e) => {
                 console.error('Audio error:', e);
                 audioStatus = 'idle';
-                addMessage("System", `Audio error: ${e.message || 'Unknown error'}`);
+                const errorMsg = currentAudio.error ? `Error code: ${currentAudio.error.code}` : 'Unknown error';
+                addMessage("System", `Audio error: ${errorMsg}`);
                 currentAudio = null;
             });
             
             // Set volume and play
             currentAudio.volume = 1.0; // Max volume
-            await currentAudio.play();
+            
+            // Wait for the audio to be ready before playing
+            if (currentAudio.readyState >= 2) { // HAVE_CURRENT_DATA
+                await currentAudio.play();
+            } else {
+                // Wait for enough data to be loaded
+                await new Promise((resolve, reject) => {
+                    const onCanPlay = () => {
+                        currentAudio.removeEventListener('canplay', onCanPlay);
+                        currentAudio.removeEventListener('error', onError);
+                        resolve();
+                    };
+                    const onError = (e) => {
+                        currentAudio.removeEventListener('canplay', onCanPlay);
+                        currentAudio.removeEventListener('error', onError);
+                        reject(e);
+                    };
+                    currentAudio.addEventListener('canplay', onCanPlay);
+                    currentAudio.addEventListener('error', onError);
+                });
+                await currentAudio.play();
+            }
             
         } catch (error) {
             console.error('Error playing audio:', error);
@@ -433,9 +489,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Let's try once immediately
     setTimeout(fetchTranscript, 500);
     
-    // Then poll every 2 seconds for both transcript and audio commands
+    // Then poll every 2 seconds for transcript and every 3 seconds for audio commands
     setInterval(fetchTranscript, 2000);
-    setInterval(pollAudioCommands, 2000);
+    setInterval(pollAudioCommands, 3000);  // Reduced frequency to avoid interference
 
     console.log('Visual-only agent is running with audio support.');
 });

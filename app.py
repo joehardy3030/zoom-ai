@@ -281,8 +281,25 @@ def ping():
 # Audio functionality
 @app.route('/audio/<filename>')
 def serve_audio(filename):
-    """Serve audio files from the audio directory"""
-    return send_from_directory('audio', filename)
+    """Serve audio files from the audio directory with better streaming support"""
+    try:
+        # Add headers for better audio streaming
+        response = send_from_directory('audio', filename)
+        
+        # Set headers for better streaming and caching
+        response.headers['Accept-Ranges'] = 'bytes'
+        response.headers['Cache-Control'] = 'public, max-age=3600'  # Cache for 1 hour
+        response.headers['Content-Type'] = 'audio/mpeg'
+        
+        # Enable CORS for the audio files
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Range'
+        
+        return response
+    except Exception as e:
+        print(f"Error serving audio file {filename}: {e}")
+        return jsonify({"error": "Audio file not found"}), 404
 
 @app.route('/api/bot/<bot_id>/play-audio', methods=['POST'])
 def play_audio(bot_id):
