@@ -273,137 +273,57 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         
-        // Simple audio test function - bypasses all complex logic
-        const playAudioSimple = async (audioFile) => {
+        // Simple audio functions - mimicking direct browser audio that works
+        const playAudioFile = async (audioFile) => {
             console.log(`🎵 SIMPLE: Playing ${audioFile}`);
             
             // Stop any existing audio
             if (currentAudio) {
                 currentAudio.pause();
+                currentAudio.src = '';
                 currentAudio = null;
             }
             
-            // Create simple audio element
+            // Create simple audio element like the dashboard direct audio
             currentAudio = new Audio(`${backendUrl}/audio/${audioFile}`);
             currentAudio.volume = 0.8;
             
-            // Just play it - no complex event handling
+            // Simple play - no complex event handling
             try {
                 await currentAudio.play();
-                console.log('🎵 SIMPLE: Audio playing');
-                addMessage("System", `🎵 SIMPLE: Playing ${audioFile}`);
+                console.log('🎵 SIMPLE: Audio started');
+                addMessage("System", `🎵 Playing: ${audioFile}`);
+                isAudioPlaying = true;
             } catch (error) {
-                console.error('🎵 SIMPLE: Play error:', error);
-                addMessage("System", `❌ SIMPLE: Error playing audio`);
+                console.error('🎵 SIMPLE: Play failed:', error);
+                addMessage("System", `❌ Audio failed: ${error.message}`);
+                isAudioPlaying = false;
             }
+            
+            // Only listen for end event to reset state
+            currentAudio.onended = () => {
+                console.log('🎵 SIMPLE: Audio ended');
+                isAudioPlaying = false;
+                currentAudio = null;
+            };
+            
+            // Handle errors
+            currentAudio.onerror = (e) => {
+                console.error('🎵 SIMPLE: Audio error:', e);
+                isAudioPlaying = false;
+                currentAudio = null;
+            };
         };
 
-        // Audio functions
-        const playAudioFile = async (audioFile) => {
-            console.log(`🎵 Playing: ${audioFile}`);
-            
-            // TEST: Try simple method first
-            if (window.location.search.includes('simple=1')) {
-                return playAudioSimple(audioFile);
-            }
-            
-            try {
-                // Stop current audio immediately
-                if (currentAudio) {
-                    currentAudio.pause();
-                    currentAudio.currentTime = 0;
-                    currentAudio = null;
-                }
-                
-                audioStatus = 'loading';
-                isAudioPlaying = false;
-                addMessage("System", `🎵 Loading: ${audioFile}`);
-                
-                // Create audio element with optimized settings for fast playback
-                currentAudio = new Audio(`${backendUrl}/audio/${audioFile}`);
-                currentAudio.preload = 'metadata'; // Load just enough to start quickly
-                currentAudio.volume = 0.8;
-                
-                // Optimized event listeners for immediate playback
-                currentAudio.onloadedmetadata = () => {
-                    console.log('🎵 Audio metadata loaded - ready to play');
-                };
-                
-                currentAudio.oncanplaythrough = () => {
-                    console.log('🎵 Audio fully buffered - starting playback');
-                    if (audioStatus === 'loading') {
-                        audioStatus = 'playing';
-                        isAudioPlaying = true;
-                        addMessage("System", `🎵 Playing: ${audioFile}`);
-                        currentAudio.play().catch(e => console.error('Play error:', e));
-                    }
-                };
-                
-                // Start playing as soon as we have enough data (faster startup)
-                currentAudio.oncanplay = () => {
-                    console.log('🎵 Audio can play - starting immediately for faster response');
-                    if (audioStatus === 'loading') {
-                        audioStatus = 'playing';
-                        isAudioPlaying = true;
-                        addMessage("System", `🎵 Playing: ${audioFile}`);
-                        currentAudio.play().catch(e => console.error('Play error:', e));
-                    }
-                };
-                
-                currentAudio.onplaying = () => {
-                    console.log('🎵 Audio playing confirmed');
-                    audioStatus = 'playing';
-                    isAudioPlaying = true;
-                    // Reduce polling frequency while playing to avoid interference
-                    startPolling();
-                };
-                
-                currentAudio.onended = () => {
-                    console.log('🎵 Audio playback finished');
-                    audioStatus = 'idle';
-                    isAudioPlaying = false;
-                    addMessage("System", `✅ Finished: ${audioFile}`);
-                    startPolling(); // Resume normal polling
-                };
-                
-                currentAudio.onerror = (e) => {
-                    audioStatus = 'error';
-                    isAudioPlaying = false;
-                    console.error('Audio error:', e);
-                    addMessage("System", `❌ Audio error`);
-                    startPolling();
-                };
-                
-                // Handle network issues gracefully
-                currentAudio.onstalled = () => {
-                    console.warn('🎵 Audio stalled - buffering');
-                };
-                
-                currentAudio.onwaiting = () => {
-                    console.warn('🎵 Audio waiting - buffering more data');
-                };
-                
-                // Start loading
-                currentAudio.load();
-                
-            } catch (error) {
-                console.error('Audio error:', error);
-                audioStatus = 'error';
-                isAudioPlaying = false;
-                addMessage("System", `❌ Failed: ${error.message}`);
-                startPolling();
-            }
-        };
-        
         const stopAudio = () => {
             if (currentAudio) {
                 currentAudio.pause();
-                currentAudio.currentTime = 0;
+                currentAudio.src = '';
+                currentAudio = null;
+                isAudioPlaying = false;
+                console.log('🎵 SIMPLE: Audio stopped');
+                addMessage("System", "⏹️ Audio stopped");
             }
-            audioStatus = 'idle';
-            isAudioPlaying = false;
-            addMessage("System", "🛑 Audio stopped");
-            startPolling();
         };
         
         // Polling functions with moderate reduction during audio
