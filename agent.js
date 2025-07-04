@@ -92,12 +92,27 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         document.body.appendChild(earlyDebugEl);
         
-        // Fallback: Get the most recently created bot that has active transcript data
+        // Fallback: Get the exact bot ID that was just deployed
         const tryGetBotIdFromBackend = async () => {
             try {
-                console.log('Attempting to get bot ID from backend...');
+                console.log('Attempting to get the latest deployed bot ID from backend...');
                 
-                // First, try to get active bots that have transcript data
+                // First, try to get the exact bot ID that was just deployed
+                const latestBotResponse = await fetch(`${backendUrl}/api/latest-bot-id`);
+                if (latestBotResponse.ok) {
+                    const latestBotData = await latestBotResponse.json();
+                    if (latestBotData.success && latestBotData.bot_id) {
+                        botId = latestBotData.bot_id;
+                        console.log('✅ Using latest deployed bot ID:', botId);
+                        statusEl.textContent = 'Using latest deployed bot';
+                        document.body.removeChild(earlyDebugEl);
+                        initializeAgent();
+                        return;
+                    }
+                }
+                
+                // Fallback: If no latest bot stored, try to get active bots that have transcript data
+                console.log('No latest bot found, checking active bots with transcript data...');
                 const activeBotsResponse = await fetch(`${backendUrl}/api/bots`);
                 let activeBotIds = [];
                 
@@ -107,58 +122,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('Active bots with transcript data:', activeBotIds);
                 }
                 
-                // If we have active bots with transcript data, use them
-                if (activeBotIds.length === 1) {
+                // If we have active bots with transcript data, use the first one
+                if (activeBotIds.length > 0) {
                     botId = activeBotIds[0];
-                    console.log('✅ Found single active bot ID:', botId);
-                    statusEl.textContent = 'Using active bot';
+                    console.log('✅ Using active bot with transcript data:', botId);
+                    statusEl.textContent = 'Using active bot with transcript data';
                     document.body.removeChild(earlyDebugEl);
                     initializeAgent();
                     return;
-                } else if (activeBotIds.length > 1) {
-                    // Multiple active bots - get the most recent one from Recall API
-                    const recallBotsResponse = await fetch(`${backendUrl}/api/recall-bots`);
-                    if (recallBotsResponse.ok) {
-                        const recallData = await recallBotsResponse.json();
-                        const allBots = recallData.bots?.results || recallData.bots || [];
-                        
-                        // Filter to only include bots that have active transcript data
-                        const activeBotsWithData = allBots.filter(bot => activeBotIds.includes(bot.id));
-                        
-                        if (activeBotsWithData.length > 0) {
-                            // Sort by creation time to get the most recent - with better date handling
-                            const sortedBots = activeBotsWithData.sort((a, b) => {
-                                const getTimestamp = (bot) => {
-                                    try {
-                                        const dateStr = bot.created_at || bot.created || bot.timestamp || '';
-                                        if (dateStr) {
-                                            return new Date(dateStr).getTime();
-                                        }
-                                        return 0;
-                                    } catch (error) {
-                                        console.warn('Date parsing error for bot', bot.id, ':', error);
-                                        return 0;
-                                    }
-                                };
-                                
-                                const timeA = getTimestamp(a);
-                                const timeB = getTimestamp(b);
-                                return timeB - timeA; // Most recent first
-                            });
-                            
-                            botId = sortedBots[0].id;
-                            console.log('✅ Using most recent active bot:', botId);
-                            console.log('Bot creation time:', sortedBots[0].created_at || sortedBots[0].created);
-                            statusEl.textContent = 'Using most recent active bot';
-                            document.body.removeChild(earlyDebugEl);
-                            initializeAgent();
-                            return;
-                        }
-                    }
                 }
                 
-                // If no active bots with transcript data, fall back to the most recent bot from Recall API
-                // (New bots might not have transcript data yet)
+                // Final fallback: Get the most recent bot from Recall API (with proper date parsing)
                 console.log('No active bots with transcript data, checking all bots from Recall API...');
                 const recallBotsResponse = await fetch(`${backendUrl}/api/recall-bots`);
                 if (recallBotsResponse.ok) {
@@ -166,10 +140,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const allBots = recallData.bots?.results || recallData.bots || [];
                     
                     if (allBots.length > 0) {
+                        // Filter out expired bots first
+                        const activeBots = allBots.filter(bot => bot.status !== 'media_expired');
+                        const botsToSort = activeBots.length > 0 ? activeBots : allBots;
+                        
                         // Sort by creation time to get the most recent - with better date handling
-                        const sortedBots = allBots.sort((a, b) => {
+                        const sortedBots = botsToSort.sort((a, b) => {
                             const getTimestamp = (bot) => {
                                 try {
+                                    // Try multiple possible date field names
                                     const dateStr = bot.created_at || bot.created || bot.timestamp || '';
                                     if (dateStr) {
                                         return new Date(dateStr).getTime();
@@ -188,8 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         botId = sortedBots[0].id;
                         console.log('✅ Using most recent bot from Recall API:', botId);
-                        console.log('Bot creation time:', sortedBots[0].created_at || sortedBots[0].created);
                         console.log('Bot status:', sortedBots[0].status);
+                        console.log('Bot creation time:', sortedBots[0].created_at || sortedBots[0].created || 'no date');
                         statusEl.textContent = 'Using most recent bot (waiting for transcript data)';
                         document.body.removeChild(earlyDebugEl);
                         initializeAgent();

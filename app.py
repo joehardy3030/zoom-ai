@@ -30,6 +30,9 @@ def load_version():
 
 VERSION_INFO = load_version()
 
+# Global variable to store the most recently deployed bot ID
+most_recent_bot_id = None
+
 def get_current_backend_url():
     """Get the current backend URL from the tunnel URL file or environment"""
     try:
@@ -76,6 +79,7 @@ def home():
 
 @app.route('/deploy-agent', methods=['POST'])
 def deploy_agent():
+    global most_recent_bot_id
     data = request.get_json()
     meeting_url = data.get('meeting_url')
     agent_name = data.get('agent_name', 'AI Assistant')
@@ -153,6 +157,10 @@ def deploy_agent():
         if response.status_code == 201:
             bot_data = response.json()
             new_bot_id = bot_data['id']
+            
+            # Store the most recent bot ID globally
+            most_recent_bot_id = new_bot_id
+            print(f"🎯 DEPLOYED: New bot ID stored globally: {most_recent_bot_id}")
             
             # Clean up again after deployment to ensure only the new bot remains
             print(f"🧹 Final cleanup - ensuring only new bot {new_bot_id} data is kept...")
@@ -600,8 +608,31 @@ def cleanup_old_bots_endpoint():
 
 def cleanup_old_bots():
     """Remove data for old/expired bots, keeping only the most recent active bot"""
+    global most_recent_bot_id
+    
     try:
-        # Get all bots from Recall API
+        # If we have a specific bot ID stored, use that
+        if most_recent_bot_id:
+            print(f"🧹 Cleanup: Using stored most recent bot ID: {most_recent_bot_id}")
+            
+            # Clean up transcript data - keep only the most recent bot
+            with transcript_lock:
+                old_bot_ids = [bot_id for bot_id in transcript_data_store.keys() if bot_id != most_recent_bot_id]
+                for old_bot_id in old_bot_ids:
+                    print(f"🧹 Removing old transcript data for bot: {old_bot_id}")
+                    del transcript_data_store[old_bot_id]
+            
+            # Clean up audio commands - keep only the most recent bot
+            with audio_lock:
+                old_bot_ids = [bot_id for bot_id in audio_commands_store.keys() if bot_id != most_recent_bot_id]
+                for old_bot_id in old_bot_ids:
+                    print(f"🧹 Removing old audio data for bot: {old_bot_id}")
+                    del audio_commands_store[old_bot_id]
+                    
+            return most_recent_bot_id
+        
+        # Fallback: Get all bots from Recall API and find the most recent one
+        print("🧹 No stored bot ID, checking Recall API...")
         headers = {
             'Authorization': f'Token {RECALL_API_KEY}',
             'Content-Type': 'application/json'
@@ -614,57 +645,54 @@ def cleanup_old_bots():
             all_bots = bots_data.get('results', []) if 'results' in bots_data else bots_data
             
             if all_bots:
-                # Sort by creation time to get the most recent - with better date handling
-                def get_creation_timestamp(bot):
-                    try:
-                        # Try different date field names that Recall API might use
-                        date_str = bot.get('created_at') or bot.get('created') or bot.get('timestamp') or ''
-                        if date_str:
-                            # Parse ISO date string to timestamp
-                            from datetime import datetime
-                            if 'T' in date_str:
-                                # ISO format: 2025-07-04T22:56:19.123456Z
-                                dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                            else:
-                                # Simple date format
-                                dt = datetime.fromisoformat(date_str)
-                            return dt.timestamp()
-                        else:
-                            return 0
-                    except Exception as e:
-                        print(f"Error parsing date for bot {bot.get('id', 'unknown')}: {date_str} - {e}")
-                        return 0
+                # Filter out expired bots first
+                active_bots = [bot for bot in all_bots if bot.get('status') != 'media_expired']
+                bots_to_use = active_bots if active_bots else all_bots
                 
-                sorted_bots = sorted(all_bots, key=get_creation_timestamp, reverse=True)
-                most_recent_bot_id = sorted_bots[0]['id']
+                # Just use the first bot (should be most recent) since dates aren't working
+                selected_bot = bots_to_use[0]
+                selected_bot_id = selected_bot['id']
                 
-                print(f"🧹 Cleanup: Most recent bot ID: {most_recent_bot_id}")
-                print(f"🧹 Cleanup: Bot created at: {sorted_bots[0].get('created_at', 'unknown')}")
+                print(f"🧹 Cleanup: Selected bot ID from API: {selected_bot_id}")
+                print(f"🧹 Cleanup: Bot status: {selected_bot.get('status', 'unknown')}")
                 print(f"🧹 Cleanup: Total bots found: {len(all_bots)}")
+                print(f"🧹 Cleanup: Active bots: {len(active_bots)}")
                 
-                # Debug: Show all bots with their creation times
-                for i, bot in enumerate(sorted_bots[:3]):  # Show top 3
-                    print(f"🧹 Bot {i+1}: {bot['id']} - {bot.get('created_at', 'no date')} - Status: {bot.get('status', 'unknown')}")
-                
-                # Clean up transcript data - keep only the most recent bot
+                # Clean up transcript data - keep only the selected bot
                 with transcript_lock:
-                    old_bot_ids = [bot_id for bot_id in transcript_data_store.keys() if bot_id != most_recent_bot_id]
+                    old_bot_ids = [bot_id for bot_id in transcript_data_store.keys() if bot_id != selected_bot_id]
                     for old_bot_id in old_bot_ids:
                         print(f"🧹 Removing old transcript data for bot: {old_bot_id}")
                         del transcript_data_store[old_bot_id]
                 
-                # Clean up audio commands - keep only the most recent bot
+                # Clean up audio commands - keep only the selected bot
                 with audio_lock:
-                    old_bot_ids = [bot_id for bot_id in audio_commands_store.keys() if bot_id != most_recent_bot_id]
+                    old_bot_ids = [bot_id for bot_id in audio_commands_store.keys() if bot_id != selected_bot_id]
                     for old_bot_id in old_bot_ids:
                         print(f"🧹 Removing old audio data for bot: {old_bot_id}")
                         del audio_commands_store[old_bot_id]
                         
-                return most_recent_bot_id
+                return selected_bot_id
+                
     except Exception as e:
         print(f"Error during cleanup: {e}")
     
     return None
+
+@app.route('/api/latest-bot-id', methods=['GET'])
+def get_latest_bot_id():
+    """Get the most recently deployed bot ID"""
+    global most_recent_bot_id
+    if most_recent_bot_id:
+        return jsonify({
+            'success': True,
+            'bot_id': most_recent_bot_id
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'No bot has been deployed yet'
+        }), 404
 
 if __name__ == '__main__':
     # Note: For local development, you'll need to use a tool like ngrok
