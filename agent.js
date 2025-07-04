@@ -190,65 +190,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 isAudioPlaying = false;
                 addMessage("System", `🎵 Loading: ${audioFile}`);
                 
-                // Create optimized audio element with better buffering
+                // Create audio element with immediate playback focus
                 currentAudio = new Audio(`${backendUrl}/audio/${audioFile}`);
                 currentAudio.preload = 'auto';
                 currentAudio.volume = 0.8;
                 
-                // Enhanced buffering and error handling
-                currentAudio.crossOrigin = "anonymous";
+                // Simple event listeners for immediate playback
+                currentAudio.onloadstart = () => {
+                    console.log('🎵 Audio loading started');
+                };
                 
-                // Improve buffering for smoother playback
-                if (currentAudio.buffered) {
-                    currentAudio.addEventListener('progress', () => {
-                        console.log(`🎵 Audio buffering progress: ${Math.round((currentAudio.buffered.length > 0 ? currentAudio.buffered.end(0) / currentAudio.duration : 0) * 100)}%`);
-                    });
-                }
-                
-                // Wait for sufficient buffering before playing
-                const audioReady = new Promise((resolve, reject) => {
-                    let timeoutId;
-                    
-                    const checkReady = () => {
-                        // Wait for either canplaythrough OR sufficient buffering
-                        if (currentAudio.readyState >= 3 || 
-                            (currentAudio.buffered.length > 0 && currentAudio.buffered.end(0) > 2)) {
-                            clearTimeout(timeoutId);
-                            resolve();
-                        }
-                    };
-                    
-                    currentAudio.oncanplaythrough = checkReady;
-                    currentAudio.onprogress = checkReady;
-                    currentAudio.onerror = (e) => {
-                        clearTimeout(timeoutId);
-                        reject(e);
-                    };
-                    
-                    // Timeout after 10 seconds
-                    timeoutId = setTimeout(() => {
-                        reject(new Error('Audio loading timeout'));
-                    }, 10000);
-                    
-                    currentAudio.onloadstart = () => {
-                        console.log('🎵 Audio loading started');
-                        audioStatus = 'loading';
-                        startPolling(); // This will pause polling during loading
-                    };
-                    currentAudio.onloadeddata = () => {
-                        console.log('🎵 Audio data loaded');
-                    };
-                    currentAudio.oncanplay = () => {
-                        console.log('🎵 Audio can start playing');
-                    };
-                });
-                
-                // Set up event listeners before loading
-                currentAudio.onplaying = () => {
+                currentAudio.oncanplay = () => {
+                    console.log('🎵 Audio can play - starting immediately');
                     audioStatus = 'playing';
                     isAudioPlaying = true;
                     addMessage("System", `🎵 Playing: ${audioFile}`);
-                    startPolling(); // Restart with minimal frequency
+                    startPolling(); // Restart with reduced frequency
+                    currentAudio.play().catch(e => console.error('Play error:', e));
+                };
+                
+                currentAudio.onplaying = () => {
+                    console.log('🎵 Audio playing');
+                    audioStatus = 'playing';
+                    isAudioPlaying = true;
                 };
                 
                 currentAudio.onended = () => {
@@ -262,24 +226,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     audioStatus = 'error';
                     isAudioPlaying = false;
                     console.error('Audio error:', e);
-                    addMessage("System", `❌ Audio error: ${e.message || 'Unknown error'}`);
+                    addMessage("System", `❌ Audio error`);
                     startPolling();
                 };
                 
                 currentAudio.onstalled = () => {
-                    console.warn('🎵 Audio stalled - buffering');
+                    console.warn('🎵 Audio stalled - will continue when buffered');
                 };
                 
                 currentAudio.onwaiting = () => {
                     console.warn('🎵 Audio waiting - buffering');
                 };
                 
-                // Start loading the audio
+                // Start loading immediately
                 currentAudio.load();
-                
-                // Wait for audio to be ready, then play
-                await audioReady;
-                await currentAudio.play();
                 
             } catch (error) {
                 console.error('Audio error:', error);
@@ -301,14 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
             startPolling();
         };
         
-        // Polling functions with minimal interference
+        // Polling functions with moderate reduction during audio
         const pollAudioCommands = async () => {
-            // Skip polling if audio is in a critical state
-            if (audioStatus === 'loading' || (isAudioPlaying && currentAudio && currentAudio.readyState < 3)) {
-                console.log('⏸️ Skipping audio command poll - audio loading/buffering');
-                return;
-            }
-            
             try {
                 const response = await fetch(`${backendUrl}/api/bot/${botId}/audio-command`);
                 if (!response.ok) return;
@@ -328,12 +282,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         const fetchTranscript = async () => {
-            // Skip transcript polling if audio is in a critical loading state
-            if (audioStatus === 'loading') {
-                console.log('⏸️ Skipping transcript poll - audio loading');
-                return;
-            }
-            
             try {
                 const response = await fetch(`${backendUrl}/api/bot/${botId}/transcript`);
                 if (!response.ok) {
@@ -372,19 +320,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         
-        // Smart polling with minimal interference during audio
+        // Balanced polling - responsive but not interfering with audio
         const startPolling = () => {
             clearInterval(transcriptPollingInterval);
             clearInterval(audioPollingInterval);
             
-            // Completely pause polling during audio loading, drastically reduce during playback
-            if (audioStatus === 'loading') {
-                console.log('🎵 Audio loading - pausing all polling');
-                return; // Don't start any polling while loading
-            }
-            
-            const transcriptInterval = isAudioPlaying ? 30000 : 3000;  // 30s during audio, 3s normally
-            const audioInterval = isAudioPlaying ? 25000 : 8000;       // 25s during audio, 8s normally
+            // Moderate reduction during audio playback for balance
+            const transcriptInterval = isAudioPlaying ? 8000 : 3000;   // 8s during audio, 3s normally
+            const audioInterval = isAudioPlaying ? 12000 : 5000;       // 12s during audio, 5s normally
             
             console.log(`Polling intervals - Transcript: ${transcriptInterval}ms, Audio: ${audioInterval}ms`);
             
