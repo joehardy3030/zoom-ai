@@ -113,7 +113,7 @@ def deploy_agent():
                 "kind": "webpage",
                 "config": {
                     # Use our optimized agent - IMPORTANT: Use single curly braces for BOT_ID placeholder
-                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(current_backend_url)}&v=1.0.11",
+                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(current_backend_url)}&v=1.0.14",
                     "width": 1280,
                     "height": 720
                 }

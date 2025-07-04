@@ -1,6 +1,6 @@
-// AI Agent v1.0.12 - Audio Optimization + Enhanced Bot ID Handling
+// AI Agent v1.0.14 - Enhanced Bot ID Selection + Immediate Audio
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🤖 Agent v1.0.12 - Starting initialization');
+    console.log('🤖 Agent v1.0.14 - Starting initialization');
 
     // Prevent multiple initializations
     if (window.agentInitialized) {
@@ -84,9 +84,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         initializeAgent();
                         return;
                     } else if (bots.length > 1) {
-                        // Use the most recent bot (first in list)
-                        botId = bots[0].id;
-                        console.log('✅ Using most recent bot ID:', botId);
+                        // Sort by creation time to get the most recent bot
+                        const sortedBots = bots.sort((a, b) => {
+                            const timeA = new Date(a.created_at || a.created || 0).getTime();
+                            const timeB = new Date(b.created_at || b.created || 0).getTime();
+                            return timeB - timeA; // Most recent first
+                        });
+                        
+                        botId = sortedBots[0].id;
+                        console.log('✅ Using most recent bot ID:', botId, 'from', sortedBots.length, 'bots');
+                        console.log('Bot creation time:', sortedBots[0].created_at || sortedBots[0].created);
                         statusEl.textContent = 'Using most recent bot';
                         document.body.removeChild(earlyDebugEl); // Remove red debug box
                         initializeAgent();
@@ -139,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update debug info
         const updateDebugInfo = () => {
             debugEl.innerHTML = `
-                <strong>🔧 DEBUG INFO v1.0.12</strong><br>
+                <strong>🔧 DEBUG INFO v1.0.14</strong><br>
                 Bot ID: ${botId}<br>
                 Backend: ${backendUrl}<br>
                 Audio: ${audioStatus} (${isAudioPlaying ? 'Playing' : 'Idle'})<br>
@@ -346,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(pollAudioCommands, 1000);
         startPolling();
         
-        console.log('🤖 Agent v1.0.12 initialized with enhanced bot ID handling');
+        console.log('🤖 Agent v1.0.14 initialized with enhanced bot ID handling');
     }
 });
 
