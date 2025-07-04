@@ -86,11 +86,12 @@
         <!-- Bot Management -->
         <div id="botManagement" style="margin-top: 30px; padding-top: 30px; border-top: 2px solid #e5e7eb;">
             <h2>🤖 Bot Management</h2>
-            <p>Manage active bots from Recall.ai</p>
+            <p>Manage active bots from Recall.ai. You can delete bot media (recordings, transcripts) to free up storage space.</p>
             
             <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                 <button onclick="listBots()">📋 List All Bots</button>
                 <button onclick="deleteAllBots()" style="background: #dc2626;">🗑️ Delete All Bots</button>
+                <button onclick="deleteAllMedia()" style="background: #f59e0b;">🗂️ Delete All Media</button>
             </div>
             
             <div id="botsList" style="margin-top: 20px;"></div>
@@ -211,6 +212,7 @@
                                         <strong>Agent URL:</strong> ${bot.output_media?.camera?.config?.url ? 'Configured' : 'Not configured'}
                                     </div>
                                     <div style="display: flex; gap: 10px;">
+                                        <button onclick="deleteBotMedia('${bot.id}')" style="background: #f59e0b; padding: 8px 16px;">🗂️ Delete Media</button>
                                         ${canDelete ? 
                                             `<button onclick="deleteBot('${bot.id}')" style="background: #dc2626; padding: 8px 16px;">🗑️ Delete</button>` :
                                             `<button disabled style="background: #9ca3af; padding: 8px 16px;" title="Cannot delete bots that have joined calls">🗑️ Cannot Delete</button>`
@@ -305,6 +307,61 @@
             } catch (error) {
                 console.error('Error deleting all bots:', error);
                 alert(`Error deleting bots: ${error.message}`);
+            }
+        }
+
+        // Media deletion functions
+        async function deleteBotMedia(botId) {
+            if (!confirm(`Are you sure you want to delete all media (recordings, transcripts, etc.) for bot ${botId}? This cannot be undone!`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/recall-bots/${botId}/delete-media`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Bot media deleted successfully!');
+                    listBots(); // Refresh the list
+                } else {
+                    alert(`Error deleting bot media: ${result.error}`);
+                }
+                
+            } catch (error) {
+                console.error('Error deleting bot media:', error);
+                alert(`Error deleting bot media: ${error.message}`);
+            }
+        }
+        
+        async function deleteAllMedia() {
+            if (!confirm('Are you sure you want to delete ALL media (recordings, transcripts, etc.) for ALL bots? This cannot be undone!')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/recall-bots/delete-all-media', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    let message = result.message;
+                    if (result.errors && result.errors.length > 0) {
+                        message += `\n\nSome errors occurred:\n${result.errors.join('\n')}`;
+                    }
+                    alert(message);
+                    listBots(); // Refresh the list
+                } else {
+                    alert(`Error deleting all media: ${result.error}`);
+                }
+                
+            } catch (error) {
+                console.error('Error deleting all media:', error);
+                alert(`Error deleting all media: ${error.message}`);
             }
         }
 

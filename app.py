@@ -84,10 +84,13 @@ def deploy_agent():
     # The webhook URL for Recall.ai to send transcript data to.
     # In production, this must be a publicly accessible URL.
     # For local development, you would use a tool like ngrok.
-    webhook_url = current_backend_url + "/api/webhook/transcript"
-    
     # Get our backend URL for the agent to use
     current_backend_url = get_current_backend_url()
+    
+    if not current_backend_url:
+        return jsonify({"success": False, "error": "No backend URL available. Please ensure the tunnel is running."}), 500
+    
+    webhook_url = current_backend_url + "/api/webhook/transcript"
     
     # DEBUG: Print what backend URL we're actually using
     print(f"🔍 DEBUG: Current backend URL: {current_backend_url}")
@@ -466,6 +469,101 @@ def get_audio_command(bot_id):
         else:
             # No commands pending
             return jsonify({"command": "none"})
+
+@app.route('/api/recall-bots/<bot_id>/delete-media', methods=['POST'])
+def delete_bot_media(bot_id):
+    """Delete media (recordings, transcripts, etc.) for a specific bot"""
+    headers = {
+        'Authorization': f'Token {RECALL_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        api_base = get_recall_api_base()
+        response = requests.post(
+            f'{api_base}/bot/{bot_id}/delete_media',
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'message': f'Media for bot {bot_id} deleted successfully'
+            })
+        else:
+            return jsonify({
+                'error': f'Failed to delete bot media: {response.text}',
+                'status_code': response.status_code
+            }), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/recall-bots/delete-all-media', methods=['POST'])
+def delete_all_bot_media():
+    """Delete media for all bots"""
+    headers = {
+        'Authorization': f'Token {RECALL_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        # First get all bots
+        api_base = get_recall_api_base()
+        response = requests.get(
+            f'{api_base}/bot',
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            return jsonify({
+                'error': f'Failed to list bots: {response.text}',
+                'status_code': response.status_code
+            }), 400
+        
+        bots_data = response.json()
+        bots = bots_data.get('results', []) if 'results' in bots_data else bots_data
+        
+        if not bots:
+            return jsonify({
+                'success': True,
+                'message': 'No bots found to delete media from',
+                'deleted_count': 0
+            })
+        
+        # Delete media for each bot
+        deleted_count = 0
+        errors = []
+        
+        for bot in bots:
+            bot_id = bot.get('id')
+            if not bot_id:
+                continue
+                
+            try:
+                media_response = requests.post(
+                    f'{api_base}/bot/{bot_id}/delete_media',
+                    headers=headers
+                )
+                
+                if media_response.status_code == 200:
+                    deleted_count += 1
+                else:
+                    errors.append(f"Bot {bot_id}: {media_response.text}")
+                    
+            except Exception as e:
+                errors.append(f"Bot {bot_id}: {str(e)}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Deleted media for {deleted_count} out of {len(bots)} bots',
+            'deleted_count': deleted_count,
+            'total_bots': len(bots),
+            'errors': errors if errors else None
+        })
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Note: For local development, you'll need to use a tool like ngrok
