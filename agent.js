@@ -1,6 +1,6 @@
-// AI Agent v1.0.14 - Enhanced Bot ID Selection + Immediate Audio
+// AI Agent - Dynamic Version Loading
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🤖 Agent v1.0.14 - Starting initialization');
+    console.log('🤖 Agent - Starting initialization');
 
     // Prevent multiple initializations
     if (window.agentInitialized) {
@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Get DOM elements
     const statusEl = document.getElementById('status');
     const transcriptEl = document.getElementById('transcript');
+    const versionEl = document.getElementById('version-info');
     
     if (!statusEl || !transcriptEl) {
         console.error('Required DOM elements not found!');
@@ -35,6 +36,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
+    // Load version info
+    const loadVersionInfo = async () => {
+        try {
+            const response = await fetch(`${backendUrl}/api/version`);
+            if (response.ok) {
+                const versionData = await response.json();
+                if (versionEl) {
+                    versionEl.textContent = `v${versionData.version} - ${versionData.name}`;
+                }
+                console.log('Version loaded:', versionData);
+                return versionData;
+            }
+        } catch (error) {
+            console.error('Failed to load version:', error);
+            if (versionEl) {
+                versionEl.textContent = 'Version: Unknown';
+            }
+        }
+        return null;
+    };
+    
     // Enhanced bot ID validation and fallback logic
     const isPlaceholderBotId = (id) => {
         if (!id) return true;
@@ -45,6 +67,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
         return placeholders.includes(id) || id.length < 10;
     };
+    
+    // Load version first
+    loadVersionInfo();
     
     if (isPlaceholderBotId(botId)) {
         console.warn('Bot ID is placeholder or invalid:', botId);
@@ -67,49 +92,83 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         document.body.appendChild(earlyDebugEl);
         
-        // Fallback: Try to get bot ID from backend
+        // Fallback: Get the most recently created bot that has active transcript data
         const tryGetBotIdFromBackend = async () => {
             try {
                 console.log('Attempting to get bot ID from backend...');
-                const response = await fetch(`${backendUrl}/api/recall-bots`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const bots = data.bots?.results || data.bots || [];
+                
+                // First, get active bots that have transcript data
+                const activeBotsResponse = await fetch(`${backendUrl}/api/bots`);
+                if (activeBotsResponse.ok) {
+                    const activeBotsData = await activeBotsResponse.json();
+                    const activeBotIds = Object.keys(activeBotsData.active_bots || {});
                     
-                    if (bots.length === 1) {
-                        botId = bots[0].id;
-                        console.log('✅ Found bot ID from backend:', botId);
-                        statusEl.textContent = 'Bot ID detected from backend';
-                        document.body.removeChild(earlyDebugEl); // Remove red debug box
+                    console.log('Active bots with transcript data:', activeBotIds);
+                    
+                    if (activeBotIds.length === 1) {
+                        botId = activeBotIds[0];
+                        console.log('✅ Found single active bot ID:', botId);
+                        statusEl.textContent = 'Using active bot';
+                        document.body.removeChild(earlyDebugEl);
                         initializeAgent();
                         return;
-                    } else if (bots.length > 1) {
-                        // Sort by creation time to get the most recent bot
-                        const sortedBots = bots.sort((a, b) => {
-                            const timeA = new Date(a.created_at || a.created || 0).getTime();
-                            const timeB = new Date(b.created_at || b.created || 0).getTime();
-                            return timeB - timeA; // Most recent first
-                        });
+                    } else if (activeBotIds.length > 1) {
+                        // Multiple active bots - get the most recent one from Recall API
+                        const recallBotsResponse = await fetch(`${backendUrl}/api/recall-bots`);
+                        if (recallBotsResponse.ok) {
+                            const recallData = await recallBotsResponse.json();
+                            const allBots = recallData.bots?.results || recallData.bots || [];
+                            
+                            // Filter to only include bots that have active transcript data
+                            const activeBotsWithData = allBots.filter(bot => activeBotIds.includes(bot.id));
+                            
+                            if (activeBotsWithData.length > 0) {
+                                // Sort by creation time to get the most recent
+                                const sortedBots = activeBotsWithData.sort((a, b) => {
+                                    const timeA = new Date(a.created_at || a.created || 0).getTime();
+                                    const timeB = new Date(b.created_at || b.created || 0).getTime();
+                                    return timeB - timeA; // Most recent first
+                                });
+                                
+                                botId = sortedBots[0].id;
+                                console.log('✅ Using most recent active bot:', botId);
+                                console.log('Bot creation time:', sortedBots[0].created_at || sortedBots[0].created);
+                                statusEl.textContent = 'Using most recent active bot';
+                                document.body.removeChild(earlyDebugEl);
+                                initializeAgent();
+                                return;
+                            }
+                        }
                         
-                        botId = sortedBots[0].id;
-                        console.log('✅ Using most recent bot ID:', botId, 'from', sortedBots.length, 'bots');
-                        console.log('Bot creation time:', sortedBots[0].created_at || sortedBots[0].created);
-                        statusEl.textContent = 'Using most recent bot';
-                        document.body.removeChild(earlyDebugEl); // Remove red debug box
+                        // Fallback to first active bot if we can't get creation times
+                        botId = activeBotIds[0];
+                        console.log('✅ Using first active bot as fallback:', botId);
+                        statusEl.textContent = 'Using active bot (fallback)';
+                        document.body.removeChild(earlyDebugEl);
                         initializeAgent();
                         return;
                     }
                 }
                 
-                // If we still don't have a valid bot ID, show error
-                statusEl.textContent = 'Error: Bot ID not configured properly';
-                console.error('Could not determine bot ID');
-                addMessage("System", "❌ Bot configuration error - could not detect bot ID");
+                // If no active bots with transcript data, show error
+                statusEl.textContent = 'Error: No active bots found';
+                console.error('No active bots with transcript data found');
+                earlyDebugEl.innerHTML = `
+                    <strong>❌ NO ACTIVE BOTS</strong><br>
+                    Invalid Bot ID: ${botId}<br>
+                    Backend: ${backendUrl}<br>
+                    No bots with transcript data found
+                `;
                 
             } catch (error) {
                 console.error('Failed to get bot ID from backend:', error);
-                statusEl.textContent = 'Error: Bot ID not configured properly';
-                addMessage("System", "❌ Bot configuration error - backend unreachable");
+                statusEl.textContent = 'Error: Bot ID detection failed';
+                earlyDebugEl.innerHTML = `
+                    <strong>❌ DETECTION FAILED</strong><br>
+                    Invalid Bot ID: ${botId}<br>
+                    Backend: ${backendUrl}<br>
+                    Error: ${error.message}
+                `;
             }
         };
         
@@ -121,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // If we have a valid bot ID, initialize immediately
     initializeAgent();
     
-    function initializeAgent() {
+    async function initializeAgent() {
         // Audio state
         let currentAudio = null;
         let audioStatus = 'idle';
@@ -129,8 +188,12 @@ document.addEventListener('DOMContentLoaded', () => {
         let transcriptPollingInterval = null;
         let audioPollingInterval = null;
         let lastTimestamp = 0;
+        let versionInfo = null;
         
         console.log(`✅ Initializing with Bot ID: ${botId}, Backend: ${backendUrl}`);
+        
+        // Load version info for debug display
+        versionInfo = await loadVersionInfo();
         
         // Create debug display - ALWAYS VISIBLE for troubleshooting
         const debugEl = document.createElement('div');
@@ -145,8 +208,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update debug info
         const updateDebugInfo = () => {
+            const version = versionInfo ? `v${versionInfo.version}` : 'Unknown';
             debugEl.innerHTML = `
-                <strong>🔧 DEBUG INFO v1.0.14</strong><br>
+                <strong>🔧 DEBUG INFO ${version}</strong><br>
                 Bot ID: ${botId}<br>
                 Backend: ${backendUrl}<br>
                 Audio: ${audioStatus} (${isAudioPlaying ? 'Playing' : 'Idle'})<br>
@@ -353,7 +417,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(pollAudioCommands, 1000);
         startPolling();
         
-        console.log('🤖 Agent v1.0.14 initialized with enhanced bot ID handling');
+        const version = versionInfo ? `v${versionInfo.version}` : 'Unknown';
+        console.log(`🤖 Agent ${version} initialized with enhanced bot ID handling`);
     }
 });
 
