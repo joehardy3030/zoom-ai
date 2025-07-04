@@ -614,11 +614,37 @@ def cleanup_old_bots():
             all_bots = bots_data.get('results', []) if 'results' in bots_data else bots_data
             
             if all_bots:
-                # Sort by creation time to get the most recent
-                sorted_bots = sorted(all_bots, key=lambda x: x.get('created_at', ''), reverse=True)
+                # Sort by creation time to get the most recent - with better date handling
+                def get_creation_timestamp(bot):
+                    try:
+                        # Try different date field names that Recall API might use
+                        date_str = bot.get('created_at') or bot.get('created') or bot.get('timestamp') or ''
+                        if date_str:
+                            # Parse ISO date string to timestamp
+                            from datetime import datetime
+                            if 'T' in date_str:
+                                # ISO format: 2025-07-04T22:56:19.123456Z
+                                dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                            else:
+                                # Simple date format
+                                dt = datetime.fromisoformat(date_str)
+                            return dt.timestamp()
+                        else:
+                            return 0
+                    except Exception as e:
+                        print(f"Error parsing date for bot {bot.get('id', 'unknown')}: {date_str} - {e}")
+                        return 0
+                
+                sorted_bots = sorted(all_bots, key=get_creation_timestamp, reverse=True)
                 most_recent_bot_id = sorted_bots[0]['id']
                 
                 print(f"🧹 Cleanup: Most recent bot ID: {most_recent_bot_id}")
+                print(f"🧹 Cleanup: Bot created at: {sorted_bots[0].get('created_at', 'unknown')}")
+                print(f"🧹 Cleanup: Total bots found: {len(all_bots)}")
+                
+                # Debug: Show all bots with their creation times
+                for i, bot in enumerate(sorted_bots[:3]):  # Show top 3
+                    print(f"🧹 Bot {i+1}: {bot['id']} - {bot.get('created_at', 'no date')} - Status: {bot.get('status', 'unknown')}")
                 
                 # Clean up transcript data - keep only the most recent bot
                 with transcript_lock:

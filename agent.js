@@ -126,10 +126,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         const activeBotsWithData = allBots.filter(bot => activeBotIds.includes(bot.id));
                         
                         if (activeBotsWithData.length > 0) {
-                            // Sort by creation time to get the most recent
+                            // Sort by creation time to get the most recent - with better date handling
                             const sortedBots = activeBotsWithData.sort((a, b) => {
-                                const timeA = new Date(a.created_at || a.created || 0).getTime();
-                                const timeB = new Date(b.created_at || b.created || 0).getTime();
+                                const getTimestamp = (bot) => {
+                                    try {
+                                        const dateStr = bot.created_at || bot.created || bot.timestamp || '';
+                                        if (dateStr) {
+                                            return new Date(dateStr).getTime();
+                                        }
+                                        return 0;
+                                    } catch (error) {
+                                        console.warn('Date parsing error for bot', bot.id, ':', error);
+                                        return 0;
+                                    }
+                                };
+                                
+                                const timeA = getTimestamp(a);
+                                const timeB = getTimestamp(b);
                                 return timeB - timeA; // Most recent first
                             });
                             
@@ -153,10 +166,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     const allBots = recallData.bots?.results || recallData.bots || [];
                     
                     if (allBots.length > 0) {
-                        // Sort by creation time to get the most recent
+                        // Sort by creation time to get the most recent - with better date handling
                         const sortedBots = allBots.sort((a, b) => {
-                            const timeA = new Date(a.created_at || a.created || 0).getTime();
-                            const timeB = new Date(b.created_at || b.created || 0).getTime();
+                            const getTimestamp = (bot) => {
+                                try {
+                                    const dateStr = bot.created_at || bot.created || bot.timestamp || '';
+                                    if (dateStr) {
+                                        return new Date(dateStr).getTime();
+                                    }
+                                    return 0;
+                                } catch (error) {
+                                    console.warn('Date parsing error for bot', bot.id, ':', error);
+                                    return 0;
+                                }
+                            };
+                            
+                            const timeA = getTimestamp(a);
+                            const timeB = getTimestamp(b);
                             return timeB - timeA; // Most recent first
                         });
                         
