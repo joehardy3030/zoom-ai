@@ -97,67 +97,88 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 console.log('Attempting to get bot ID from backend...');
                 
-                // First, get active bots that have transcript data
+                // First, try to get active bots that have transcript data
                 const activeBotsResponse = await fetch(`${backendUrl}/api/bots`);
+                let activeBotIds = [];
+                
                 if (activeBotsResponse.ok) {
                     const activeBotsData = await activeBotsResponse.json();
-                    const activeBotIds = Object.keys(activeBotsData.active_bots || {});
-                    
+                    activeBotIds = Object.keys(activeBotsData.active_bots || {});
                     console.log('Active bots with transcript data:', activeBotIds);
-                    
-                    if (activeBotIds.length === 1) {
-                        botId = activeBotIds[0];
-                        console.log('✅ Found single active bot ID:', botId);
-                        statusEl.textContent = 'Using active bot';
-                        document.body.removeChild(earlyDebugEl);
-                        initializeAgent();
-                        return;
-                    } else if (activeBotIds.length > 1) {
-                        // Multiple active bots - get the most recent one from Recall API
-                        const recallBotsResponse = await fetch(`${backendUrl}/api/recall-bots`);
-                        if (recallBotsResponse.ok) {
-                            const recallData = await recallBotsResponse.json();
-                            const allBots = recallData.bots?.results || recallData.bots || [];
-                            
-                            // Filter to only include bots that have active transcript data
-                            const activeBotsWithData = allBots.filter(bot => activeBotIds.includes(bot.id));
-                            
-                            if (activeBotsWithData.length > 0) {
-                                // Sort by creation time to get the most recent
-                                const sortedBots = activeBotsWithData.sort((a, b) => {
-                                    const timeA = new Date(a.created_at || a.created || 0).getTime();
-                                    const timeB = new Date(b.created_at || b.created || 0).getTime();
-                                    return timeB - timeA; // Most recent first
-                                });
-                                
-                                botId = sortedBots[0].id;
-                                console.log('✅ Using most recent active bot:', botId);
-                                console.log('Bot creation time:', sortedBots[0].created_at || sortedBots[0].created);
-                                statusEl.textContent = 'Using most recent active bot';
-                                document.body.removeChild(earlyDebugEl);
-                                initializeAgent();
-                                return;
-                            }
-                        }
+                }
+                
+                // If we have active bots with transcript data, use them
+                if (activeBotIds.length === 1) {
+                    botId = activeBotIds[0];
+                    console.log('✅ Found single active bot ID:', botId);
+                    statusEl.textContent = 'Using active bot';
+                    document.body.removeChild(earlyDebugEl);
+                    initializeAgent();
+                    return;
+                } else if (activeBotIds.length > 1) {
+                    // Multiple active bots - get the most recent one from Recall API
+                    const recallBotsResponse = await fetch(`${backendUrl}/api/recall-bots`);
+                    if (recallBotsResponse.ok) {
+                        const recallData = await recallBotsResponse.json();
+                        const allBots = recallData.bots?.results || recallData.bots || [];
                         
-                        // Fallback to first active bot if we can't get creation times
-                        botId = activeBotIds[0];
-                        console.log('✅ Using first active bot as fallback:', botId);
-                        statusEl.textContent = 'Using active bot (fallback)';
+                        // Filter to only include bots that have active transcript data
+                        const activeBotsWithData = allBots.filter(bot => activeBotIds.includes(bot.id));
+                        
+                        if (activeBotsWithData.length > 0) {
+                            // Sort by creation time to get the most recent
+                            const sortedBots = activeBotsWithData.sort((a, b) => {
+                                const timeA = new Date(a.created_at || a.created || 0).getTime();
+                                const timeB = new Date(b.created_at || b.created || 0).getTime();
+                                return timeB - timeA; // Most recent first
+                            });
+                            
+                            botId = sortedBots[0].id;
+                            console.log('✅ Using most recent active bot:', botId);
+                            console.log('Bot creation time:', sortedBots[0].created_at || sortedBots[0].created);
+                            statusEl.textContent = 'Using most recent active bot';
+                            document.body.removeChild(earlyDebugEl);
+                            initializeAgent();
+                            return;
+                        }
+                    }
+                }
+                
+                // If no active bots with transcript data, fall back to the most recent bot from Recall API
+                // (New bots might not have transcript data yet)
+                console.log('No active bots with transcript data, checking all bots from Recall API...');
+                const recallBotsResponse = await fetch(`${backendUrl}/api/recall-bots`);
+                if (recallBotsResponse.ok) {
+                    const recallData = await recallBotsResponse.json();
+                    const allBots = recallData.bots?.results || recallData.bots || [];
+                    
+                    if (allBots.length > 0) {
+                        // Sort by creation time to get the most recent
+                        const sortedBots = allBots.sort((a, b) => {
+                            const timeA = new Date(a.created_at || a.created || 0).getTime();
+                            const timeB = new Date(b.created_at || b.created || 0).getTime();
+                            return timeB - timeA; // Most recent first
+                        });
+                        
+                        botId = sortedBots[0].id;
+                        console.log('✅ Using most recent bot from Recall API:', botId);
+                        console.log('Bot creation time:', sortedBots[0].created_at || sortedBots[0].created);
+                        console.log('Bot status:', sortedBots[0].status);
+                        statusEl.textContent = 'Using most recent bot (waiting for transcript data)';
                         document.body.removeChild(earlyDebugEl);
                         initializeAgent();
                         return;
                     }
                 }
                 
-                // If no active bots with transcript data, show error
-                statusEl.textContent = 'Error: No active bots found';
-                console.error('No active bots with transcript data found');
+                // If still no bots found, show error
+                statusEl.textContent = 'Error: No bots found';
+                console.error('No bots found in Recall API');
                 earlyDebugEl.innerHTML = `
-                    <strong>❌ NO ACTIVE BOTS</strong><br>
+                    <strong>❌ NO BOTS FOUND</strong><br>
                     Invalid Bot ID: ${botId}<br>
                     Backend: ${backendUrl}<br>
-                    No bots with transcript data found
+                    No bots found in Recall API
                 `;
                 
             } catch (error) {
