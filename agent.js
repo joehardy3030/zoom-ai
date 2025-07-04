@@ -214,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let transcriptPollingInterval = null;
         let audioPollingInterval = null;
         let lastTimestamp = 0;
+        let lastAudioCommandTimestamp = 0; // Track last audio command to prevent duplicates
         let versionInfo = null;
         
         console.log(`✅ Initializing with Bot ID: ${botId}, Backend: ${backendUrl}`);
@@ -365,9 +366,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) return;
                 
                 const data = await response.json();
-                if (data.command) {
-                    console.log('Audio command:', data);
+                if (data.command && data.timestamp) {
+                    // Prevent duplicate commands by checking timestamp
+                    if (data.timestamp <= lastAudioCommandTimestamp) {
+                        console.log('Skipping duplicate audio command:', data.command, 'timestamp:', data.timestamp);
+                        return;
+                    }
+                    
+                    lastAudioCommandTimestamp = data.timestamp;
+                    console.log('New audio command:', data);
+                    
                     if (data.command === 'play' && data.audio_file) {
+                        // Don't play if already playing the same file
+                        if (isAudioPlaying && currentAudio && currentAudio.src.includes(data.audio_file)) {
+                            console.log('Already playing this file, skipping duplicate play command');
+                            return;
+                        }
                         await playAudioFile(data.audio_file);
                     } else if (data.command === 'stop') {
                         stopAudio();

@@ -482,10 +482,37 @@ def get_audio_command(bot_id):
     
     with audio_lock:
         if bot_id in audio_commands_store and audio_commands_store[bot_id]:
-            # Return the most recent command and remove it
-            command = audio_commands_store[bot_id].pop()
-            print(f"Serving audio command for Bot '{bot_id}': {command}")
-            return jsonify(command)
+            # Get the most recent command without removing it yet
+            command = audio_commands_store[bot_id][-1]
+            command_time = command.get('timestamp', 0)
+            
+            # Check if this command was served recently (within last 30 seconds)
+            current_time = time.time()
+            if hasattr(get_audio_command, 'last_served') and bot_id in get_audio_command.last_served:
+                last_served_time = get_audio_command.last_served[bot_id].get('timestamp', 0)
+                last_served_command = get_audio_command.last_served[bot_id].get('command', '')
+                
+                # If it's the same command and was served recently, don't serve it again
+                if (command_time == last_served_time and 
+                    command.get('command') == last_served_command and 
+                    current_time - command_time < 30):
+                    print(f"Skipping duplicate command for Bot '{bot_id}': {command.get('command')}")
+                    return jsonify({"command": "none"})
+            
+            # Remove the command now that we're serving it
+            served_command = audio_commands_store[bot_id].pop()
+            
+            # Track that we served this command
+            if not hasattr(get_audio_command, 'last_served'):
+                get_audio_command.last_served = {}
+            get_audio_command.last_served[bot_id] = {
+                'command': served_command.get('command'),
+                'timestamp': served_command.get('timestamp'),
+                'served_at': current_time
+            }
+            
+            print(f"Serving audio command for Bot '{bot_id}': {served_command}")
+            return jsonify(served_command)
         else:
             # No commands pending
             return jsonify({"command": "none"})
