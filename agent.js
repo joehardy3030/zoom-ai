@@ -273,9 +273,39 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         
+        // Simple audio test function - bypasses all complex logic
+        const playAudioSimple = async (audioFile) => {
+            console.log(`🎵 SIMPLE: Playing ${audioFile}`);
+            
+            // Stop any existing audio
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            
+            // Create simple audio element
+            currentAudio = new Audio(`${backendUrl}/audio/${audioFile}`);
+            currentAudio.volume = 0.8;
+            
+            // Just play it - no complex event handling
+            try {
+                await currentAudio.play();
+                console.log('🎵 SIMPLE: Audio playing');
+                addMessage("System", `🎵 SIMPLE: Playing ${audioFile}`);
+            } catch (error) {
+                console.error('🎵 SIMPLE: Play error:', error);
+                addMessage("System", `❌ SIMPLE: Error playing audio`);
+            }
+        };
+
         // Audio functions
         const playAudioFile = async (audioFile) => {
             console.log(`🎵 Playing: ${audioFile}`);
+            
+            // TEST: Try simple method first
+            if (window.location.search.includes('simple=1')) {
+                return playAudioSimple(audioFile);
+            }
             
             try {
                 // Stop current audio immediately

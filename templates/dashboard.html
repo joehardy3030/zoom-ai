@@ -114,7 +114,14 @@
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button id="playAudioBtn" onclick="playAudio()">🎵 Play Audio</button>
                 <button id="stopAudioBtn" onclick="stopAudio()">⏹️ Stop Audio</button>
+                <button onclick="testDirectAudio()" style="background: #10b981;">🧪 Test Direct Audio</button>
             </div>
+            
+            <!-- Simple audio test element -->
+            <audio id="testAudio" controls style="margin-top: 10px; display: none;">
+                <source src="/audio/ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
         </div>
         
         <div id="status" class="status"></div>
@@ -459,6 +466,11 @@
             } finally {
                 stopBtn.disabled = false;
             }
+        }
+
+        function testDirectAudio() {
+            const testAudio = document.getElementById('testAudio');
+            testAudio.style.display = testAudio.style.display === 'none' ? 'block' : 'none';
         }
     </script>
 </body>
