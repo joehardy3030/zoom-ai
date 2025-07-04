@@ -420,51 +420,41 @@ def delete_recall_bot(bot_id):
 
 @app.route('/api/bot/<bot_id>/play-audio', methods=['POST'])
 def play_audio(bot_id):
-    """Store a play audio command for a specific bot"""
+    """Store a play audio command for a specific bot - only one command at a time"""
     data = request.get_json()
     audio_file = data.get('audio_file', 'ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3')
     
     print(f"Play audio command received for Bot {bot_id}: {audio_file}")
     
     with audio_lock:
-        if bot_id not in audio_commands_store:
-            audio_commands_store[bot_id] = []
-        
-        # Add play command
-        audio_commands_store[bot_id].append({
+        # Only store ONE command per bot - replace any existing command
+        audio_commands_store[bot_id] = {
             "command": "play",
             "audio_file": audio_file,
-            "timestamp": time.time()
-        })
-        
-        # Keep only the last 10 commands
-        audio_commands_store[bot_id] = audio_commands_store[bot_id][-10:]
+            "timestamp": time.time(),
+            "served": False  # Track if this command has been served
+        }
     
     return jsonify({"status": "play command sent", "audio_file": audio_file})
 
 @app.route('/api/bot/<bot_id>/stop-audio', methods=['POST'])
 def stop_audio(bot_id):
-    """Store a stop audio command for a specific bot"""
+    """Store a stop audio command for a specific bot - only one command at a time"""
     print(f"Stop audio command received for Bot {bot_id}")
     
     with audio_lock:
-        if bot_id not in audio_commands_store:
-            audio_commands_store[bot_id] = []
-        
-        # Add stop command
-        audio_commands_store[bot_id].append({
+        # Only store ONE command per bot - replace any existing command
+        audio_commands_store[bot_id] = {
             "command": "stop",
-            "timestamp": time.time()
-        })
-        
-        # Keep only the last 10 commands
-        audio_commands_store[bot_id] = audio_commands_store[bot_id][-10:]
+            "timestamp": time.time(),
+            "served": False  # Track if this command has been served
+        }
     
     return jsonify({"status": "stop command sent"})
 
 @app.route('/api/bot/<bot_id>/audio-command', methods=['GET'])
 def get_audio_command(bot_id):
-    """Get pending audio commands for a specific bot"""
+    """Get pending audio command for a specific bot - single command only"""
     print(f"Audio command requested for Bot ID: '{bot_id}'")
     
     # Handle placeholder bot ID like we do for transcripts
@@ -481,38 +471,29 @@ def get_audio_command(bot_id):
             bot_id = latest_bot_id
     
     with audio_lock:
-        if bot_id in audio_commands_store and audio_commands_store[bot_id]:
-            # Get the most recent command without removing it yet
-            command = audio_commands_store[bot_id][-1]
-            command_time = command.get('timestamp', 0)
+        if bot_id in audio_commands_store:
+            command_data = audio_commands_store[bot_id]
             
-            # Check if this command was served recently (within last 30 seconds)
-            current_time = time.time()
-            if hasattr(get_audio_command, 'last_served') and bot_id in get_audio_command.last_served:
-                last_served_time = get_audio_command.last_served[bot_id].get('timestamp', 0)
-                last_served_command = get_audio_command.last_served[bot_id].get('command', '')
-                
-                # If it's the same command and was served recently, don't serve it again
-                if (command_time == last_served_time and 
-                    command.get('command') == last_served_command and 
-                    current_time - command_time < 30):
-                    print(f"Skipping duplicate command for Bot '{bot_id}': {command.get('command')}")
-                    return jsonify({"command": "none"})
+            # Check if command has already been served
+            if command_data.get('served', False):
+                print(f"Command already served for Bot '{bot_id}', returning none")
+                return jsonify({"command": "none"})
             
-            # Remove the command now that we're serving it
-            served_command = audio_commands_store[bot_id].pop()
+            # Mark as served and return the command
+            audio_commands_store[bot_id]['served'] = True
             
-            # Track that we served this command
-            if not hasattr(get_audio_command, 'last_served'):
-                get_audio_command.last_served = {}
-            get_audio_command.last_served[bot_id] = {
-                'command': served_command.get('command'),
-                'timestamp': served_command.get('timestamp'),
-                'served_at': current_time
+            # Return the command without the 'served' flag
+            response_command = {
+                "command": command_data["command"],
+                "timestamp": command_data["timestamp"]
             }
             
-            print(f"Serving audio command for Bot '{bot_id}': {served_command}")
-            return jsonify(served_command)
+            # Add audio_file if it's a play command
+            if command_data["command"] == "play" and "audio_file" in command_data:
+                response_command["audio_file"] = command_data["audio_file"]
+            
+            print(f"Serving audio command for Bot '{bot_id}': {response_command}")
+            return jsonify(response_command)
         else:
             # No commands pending
             return jsonify({"command": "none"})
