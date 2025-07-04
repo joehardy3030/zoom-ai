@@ -1,6 +1,6 @@
-// AI Agent v1.0.10 - Enhanced Bot ID Handling
+// AI Agent v1.0.11 - Enhanced Bot ID Handling + Version Display
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🤖 Agent v1.0.10 - Starting initialization');
+    console.log('🤖 Agent v1.0.11 - Starting initialization');
 
     // Prevent multiple initializations
     if (window.agentInitialized) {
@@ -71,23 +71,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const tryGetBotIdFromBackend = async () => {
             try {
                 console.log('Attempting to get bot ID from backend...');
-                const response = await fetch(`${backendUrl}/api/bots`);
+                const response = await fetch(`${backendUrl}/api/recall-bots`);
                 if (response.ok) {
                     const data = await response.json();
-                    const activeBots = data.active_bots || {};
-                    const botIds = Object.keys(activeBots);
+                    const bots = data.bots?.results || data.bots || [];
                     
-                    if (botIds.length === 1) {
-                        botId = botIds[0];
+                    if (bots.length === 1) {
+                        botId = bots[0].id;
                         console.log('✅ Found bot ID from backend:', botId);
                         statusEl.textContent = 'Bot ID detected from backend';
+                        document.body.removeChild(earlyDebugEl); // Remove red debug box
                         initializeAgent();
                         return;
-                    } else if (botIds.length > 1) {
+                    } else if (bots.length > 1) {
                         // Use the most recent bot (first in list)
-                        botId = botIds[0];
+                        botId = bots[0].id;
                         console.log('✅ Using most recent bot ID:', botId);
                         statusEl.textContent = 'Using most recent bot';
+                        document.body.removeChild(earlyDebugEl); // Remove red debug box
                         initializeAgent();
                         return;
                     }
@@ -138,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update debug info
         const updateDebugInfo = () => {
             debugEl.innerHTML = `
-                <strong>🔧 DEBUG INFO v1.0.10</strong><br>
+                <strong>🔧 DEBUG INFO v1.0.11</strong><br>
                 Bot ID: ${botId}<br>
                 Backend: ${backendUrl}<br>
                 Audio: ${audioStatus} (${isAudioPlaying ? 'Playing' : 'Idle'})<br>
@@ -327,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(pollAudioCommands, 1000);
         startPolling();
         
-        console.log('🤖 Agent v1.0.10 initialized with enhanced bot ID handling');
+        console.log('🤖 Agent v1.0.11 initialized with enhanced bot ID handling');
     }
 });
 
