@@ -483,11 +483,22 @@ def play_audio(bot_id):
     print(f"Play audio command received for Bot {bot_id}: {audio_file}")
     
     with audio_lock:
+        current_time = time.time()
+        
+        # Check if there's a recent command (within 5 seconds) to prevent spam
+        if bot_id in audio_commands_store:
+            existing_command = audio_commands_store[bot_id]
+            time_since_last = current_time - existing_command.get('timestamp', 0)
+            
+            if time_since_last < 5.0 and existing_command.get('command') == 'play':
+                print(f"Ignoring rapid play command for Bot {bot_id} (last command was {time_since_last:.1f}s ago)")
+                return jsonify({"status": "ignored - too soon after last command", "audio_file": audio_file})
+        
         # Only store ONE command per bot - replace any existing command
         audio_commands_store[bot_id] = {
             "command": "play",
             "audio_file": audio_file,
-            "timestamp": time.time(),
+            "timestamp": current_time,
             "served": False  # Track if this command has been served
         }
     

@@ -386,6 +386,12 @@
             }
             
             const playBtn = document.getElementById('playAudioBtn');
+            
+            // Prevent multiple rapid clicks
+            if (playBtn.disabled) {
+                return;
+            }
+            
             playBtn.disabled = true;
             playBtn.textContent = 'Sending...';
             
@@ -403,17 +409,17 @@
                 const result = await response.json();
                 console.log('Play audio response:', result);
                 
-                // Show temporary success message
-                const originalText = playBtn.textContent;
-                playBtn.textContent = '✅ Sent!';
+                // Show success and keep button disabled for 10 seconds to prevent spam
+                playBtn.textContent = '✅ Audio Sent';
                 setTimeout(() => {
                     playBtn.textContent = '🎵 Play Audio';
-                }, 2000);
+                    playBtn.disabled = false;
+                }, 10000); // 10 second cooldown
                 
             } catch (error) {
                 console.error('Error playing audio:', error);
                 alert('Error sending play command');
-            } finally {
+                playBtn.textContent = '🎵 Play Audio';
                 playBtn.disabled = false;
             }
         }

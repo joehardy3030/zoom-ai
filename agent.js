@@ -278,42 +278,58 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`🎵 Playing: ${audioFile}`);
             
             try {
-                // Stop current audio
+                // Stop current audio immediately
                 if (currentAudio) {
                     currentAudio.pause();
                     currentAudio.currentTime = 0;
+                    currentAudio = null;
                 }
                 
                 audioStatus = 'loading';
                 isAudioPlaying = false;
                 addMessage("System", `🎵 Loading: ${audioFile}`);
                 
-                // Create audio element with immediate playback focus
+                // Create audio element with optimized settings for fast playback
                 currentAudio = new Audio(`${backendUrl}/audio/${audioFile}`);
-                currentAudio.preload = 'auto';
+                currentAudio.preload = 'metadata'; // Load just enough to start quickly
                 currentAudio.volume = 0.8;
                 
-                // Simple event listeners for immediate playback
-                currentAudio.onloadstart = () => {
-                    console.log('🎵 Audio loading started');
+                // Optimized event listeners for immediate playback
+                currentAudio.onloadedmetadata = () => {
+                    console.log('🎵 Audio metadata loaded - ready to play');
                 };
                 
+                currentAudio.oncanplaythrough = () => {
+                    console.log('🎵 Audio fully buffered - starting playback');
+                    if (audioStatus === 'loading') {
+                        audioStatus = 'playing';
+                        isAudioPlaying = true;
+                        addMessage("System", `🎵 Playing: ${audioFile}`);
+                        currentAudio.play().catch(e => console.error('Play error:', e));
+                    }
+                };
+                
+                // Start playing as soon as we have enough data (faster startup)
                 currentAudio.oncanplay = () => {
-                    console.log('🎵 Audio can play - starting immediately');
-                    audioStatus = 'playing';
-                    isAudioPlaying = true;
-                    addMessage("System", `🎵 Playing: ${audioFile}`);
-                    startPolling(); // Restart with reduced frequency
-                    currentAudio.play().catch(e => console.error('Play error:', e));
+                    console.log('🎵 Audio can play - starting immediately for faster response');
+                    if (audioStatus === 'loading') {
+                        audioStatus = 'playing';
+                        isAudioPlaying = true;
+                        addMessage("System", `🎵 Playing: ${audioFile}`);
+                        currentAudio.play().catch(e => console.error('Play error:', e));
+                    }
                 };
                 
                 currentAudio.onplaying = () => {
-                    console.log('🎵 Audio playing');
+                    console.log('🎵 Audio playing confirmed');
                     audioStatus = 'playing';
                     isAudioPlaying = true;
+                    // Reduce polling frequency while playing to avoid interference
+                    startPolling();
                 };
                 
                 currentAudio.onended = () => {
+                    console.log('🎵 Audio playback finished');
                     audioStatus = 'idle';
                     isAudioPlaying = false;
                     addMessage("System", `✅ Finished: ${audioFile}`);
@@ -328,15 +344,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     startPolling();
                 };
                 
+                // Handle network issues gracefully
                 currentAudio.onstalled = () => {
-                    console.warn('🎵 Audio stalled - will continue when buffered');
+                    console.warn('🎵 Audio stalled - buffering');
                 };
                 
                 currentAudio.onwaiting = () => {
-                    console.warn('🎵 Audio waiting - buffering');
+                    console.warn('🎵 Audio waiting - buffering more data');
                 };
                 
-                // Start loading immediately
+                // Start loading
                 currentAudio.load();
                 
             } catch (error) {
@@ -431,16 +448,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         
-        // Balanced polling - responsive but not interfering with audio
+        // Optimized polling - much less aggressive during audio to prevent choppiness
         const startPolling = () => {
             clearInterval(transcriptPollingInterval);
             clearInterval(audioPollingInterval);
             
-            // Moderate reduction during audio playback for balance
-            const transcriptInterval = isAudioPlaying ? 8000 : 3000;   // 8s during audio, 3s normally
-            const audioInterval = isAudioPlaying ? 12000 : 5000;       // 12s during audio, 5s normally
+            // Much more conservative polling during audio playback
+            const transcriptInterval = isAudioPlaying ? 15000 : 3000;   // 15s during audio, 3s normally
+            const audioInterval = isAudioPlaying ? 20000 : 5000;        // 20s during audio, 5s normally
             
-            console.log(`Polling intervals - Transcript: ${transcriptInterval}ms, Audio: ${audioInterval}ms`);
+            console.log(`Polling intervals - Transcript: ${transcriptInterval}ms, Audio: ${audioInterval}ms (Audio playing: ${isAudioPlaying})`);
             
             transcriptPollingInterval = setInterval(fetchTranscript, transcriptInterval);
             audioPollingInterval = setInterval(pollAudioCommands, audioInterval);
