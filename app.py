@@ -42,14 +42,11 @@ def get_current_backend_url():
     print("❌ No backend URL found in file or environment!")
     return None
 
-# Get backend URL
-backend_url = get_current_backend_url()
-
 # Debug: Print loaded configuration (remove in production)
 print(f"Debug: API Key loaded: {'✅ Yes' if RECALL_API_KEY else '❌ No'}")
 print(f"Debug: Region: {RECALL_REGION}")
 print(f"Debug: Agent URL: {AGENT_URL}")
-print(f"Debug: Backend URL: {backend_url}")
+print(f"Debug: Backend URL: {get_current_backend_url()}")
 
 # --- In-memory storage for transcripts and audio commands ---
 # In production, you would use a database like Redis or PostgreSQL.
@@ -63,10 +60,7 @@ audio_lock = threading.Lock()
 def get_recall_api_base():
     return f'https://{RECALL_REGION}.recall.ai/api/v1'
 
-# Get our backend URL (the ngrok URL)
-def get_backend_url():
-    # This needs to be updated whenever ngrok changes
-    return request.host_url.rstrip('/')
+# Note: We use get_current_backend_url() to dynamically read the tunnel URL
 
 @app.route('/')
 def home():
