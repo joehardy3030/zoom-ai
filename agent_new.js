@@ -246,4 +246,4 @@ document.addEventListener('DOMContentLoaded', () => {
 // Handle page visibility
 document.addEventListener('visibilitychange', () => {
     console.log(`Page visibility: ${document.hidden ? 'hidden' : 'visible'}`);
-});
+}); 
