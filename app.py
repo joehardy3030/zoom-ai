@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import threading
 import time
 import json
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -18,12 +19,37 @@ CORS(app, resources={r"/*": {"origins": "*", "allow_headers": "*", "expose_heade
 RECALL_API_KEY = os.environ.get('RECALL_API_KEY')
 RECALL_REGION = os.environ.get('RECALL_REGION', 'us-west-2')
 AGENT_URL = os.environ.get('AGENT_URL', 'https://joehardy3030.github.io/zoom-ai/agent.html')
-BACKEND_URL = os.environ.get('BACKEND_URL', 'https://your-ngrok-url-here.ngrok-free.app')
+
+def get_current_backend_url():
+    """Get the current backend URL from the tunnel URL file or environment"""
+    try:
+        # First try to read from the current_url.txt file
+        if os.path.exists('current_url.txt'):
+            with open('current_url.txt', 'r') as f:
+                url = f.read().strip()
+                if url:
+                    print(f"🔍 DEBUG: Using tunnel URL from file: {url}")
+                    return url
+    except Exception as e:
+        print(f"⚠️  Could not read tunnel URL from file: {e}")
+    
+    # Fallback to environment variable
+    env_url = os.getenv('BACKEND_URL')
+    if env_url:
+        print(f"🔍 DEBUG: Using BACKEND_URL from environment: {env_url}")
+        return env_url
+    
+    print("❌ No backend URL found in file or environment!")
+    return None
+
+# Get backend URL
+backend_url = get_current_backend_url()
 
 # Debug: Print loaded configuration (remove in production)
 print(f"Debug: API Key loaded: {'✅ Yes' if RECALL_API_KEY else '❌ No'}")
 print(f"Debug: Region: {RECALL_REGION}")
 print(f"Debug: Agent URL: {AGENT_URL}")
+print(f"Debug: Backend URL: {backend_url}")
 
 # --- In-memory storage for transcripts and audio commands ---
 # In production, you would use a database like Redis or PostgreSQL.
@@ -58,14 +84,13 @@ def deploy_agent():
     # The webhook URL for Recall.ai to send transcript data to.
     # In production, this must be a publicly accessible URL.
     # For local development, you would use a tool like ngrok.
-    webhook_url = BACKEND_URL + "/api/webhook/transcript"
+    webhook_url = current_backend_url + "/api/webhook/transcript"
     
     # Get our backend URL for the agent to use
-    backend_url = BACKEND_URL
+    current_backend_url = get_current_backend_url()
     
     # DEBUG: Print what backend URL we're actually using
-    print(f"🔍 DEBUG: BACKEND_URL from environment: {BACKEND_URL}")
-    print(f"🔍 DEBUG: backend_url variable: {backend_url}")
+    print(f"🔍 DEBUG: Current backend URL: {current_backend_url}")
     print(f"🔍 DEBUG: webhook_url: {webhook_url}")
 
     # Create bot with Real-time Transcription enabled
@@ -91,7 +116,7 @@ def deploy_agent():
                 "kind": "webpage",
                 "config": {
                     # Use our optimized agent - IMPORTANT: Use single curly braces for BOT_ID placeholder
-                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(backend_url)}&v=1.0.9",
+                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(current_backend_url)}&v=1.0.9",
                     "width": 1280,
                     "height": 720
                 }
@@ -100,7 +125,7 @@ def deploy_agent():
     }
     
     # DEBUG: Print the actual agent URL being sent to Recall.ai
-    agent_full_url = f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(backend_url)}"
+    agent_full_url = f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(current_backend_url)}"
     print(f"🔍 DEBUG: Full agent URL being sent to Recall.ai: {agent_full_url}")
     
     headers = {

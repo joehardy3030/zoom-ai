@@ -1,0 +1,6 @@
+tunnel: f5045045-e303-4eea-8399-5cd65b0015ac
+credentials-file: /Users/joe/.cloudflared/f5045045-e303-4eea-8399-5cd65b0015ac.json
+
+ingress:
+  - service: http://127.0.0.1:5000
+  - service: http_status:404 
