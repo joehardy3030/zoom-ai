@@ -1,13 +1,14 @@
 # app.py - Flask backend
 import os
 import requests
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
 import threading
 import time
 import json
 from datetime import datetime
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -329,22 +330,77 @@ def ping():
 # Audio functionality
 @app.route('/audio/<filename>')
 def serve_audio(filename):
-    """Serve audio files from the audio directory with better streaming support"""
+    """Serve audio files from the audio directory with optimized streaming support"""
     try:
-        # Add headers for better audio streaming
-        response = send_from_directory('audio', filename)
+        # Get the full file path
+        file_path = os.path.join('audio', filename)
         
-        # Set headers for better streaming and caching
-        response.headers['Accept-Ranges'] = 'bytes'
-        response.headers['Cache-Control'] = 'public, max-age=3600'  # Cache for 1 hour
-        response.headers['Content-Type'] = 'audio/mpeg'
+        if not os.path.exists(file_path):
+            return jsonify({"error": "Audio file not found"}), 404
         
-        # Enable CORS for the audio files
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Range'
+        # Get file size for range requests
+        file_size = os.path.getsize(file_path)
         
-        return response
+        # Handle range requests for better streaming
+        range_header = request.headers.get('Range', None)
+        if range_header:
+            # Parse range header (e.g., "bytes=0-1023")
+            byte_start = 0
+            byte_end = file_size - 1
+            
+            if range_header:
+                match = re.search(r'bytes=(\d+)-(\d*)', range_header)
+                if match:
+                    byte_start = int(match.group(1))
+                    if match.group(2):
+                        byte_end = int(match.group(2))
+            
+            # Read the requested chunk
+            with open(file_path, 'rb') as f:
+                f.seek(byte_start)
+                chunk_size = byte_end - byte_start + 1
+                data = f.read(chunk_size)
+            
+            # Create partial content response
+            response = Response(
+                data,
+                206,  # Partial Content
+                headers={
+                    'Content-Range': f'bytes {byte_start}-{byte_end}/{file_size}',
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(chunk_size),
+                    'Content-Type': 'audio/mpeg',
+                    'Cache-Control': 'public, max-age=3600',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Range'
+                }
+            )
+            return response
+        else:
+            # Regular full file response with streaming
+            def generate():
+                with open(file_path, 'rb') as f:
+                    while True:
+                        chunk = f.read(8192)  # 8KB chunks for smooth streaming
+                        if not chunk:
+                            break
+                        yield chunk
+            
+            response = Response(
+                generate(),
+                headers={
+                    'Content-Type': 'audio/mpeg',
+                    'Content-Length': str(file_size),
+                    'Accept-Ranges': 'bytes',
+                    'Cache-Control': 'public, max-age=3600',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Range'
+                }
+            )
+            return response
+            
     except Exception as e:
         print(f"Error serving audio file {filename}: {e}")
         return jsonify({"error": "Audio file not found"}), 404

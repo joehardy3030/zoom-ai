@@ -189,7 +189,19 @@
                     
                     let html = '<h3>Active Bots:</h3>';
                     bots.forEach(bot => {
-                        const createdAt = new Date(bot.created_at).toLocaleString();
+                        // Better date parsing with error handling
+                        let createdAt = 'Unknown';
+                        try {
+                            if (bot.created_at) {
+                                const date = new Date(bot.created_at);
+                                if (!isNaN(date.getTime())) {
+                                    createdAt = date.toLocaleString();
+                                }
+                            }
+                        } catch (error) {
+                            console.warn('Date parsing error for bot', bot.id, ':', error);
+                        }
+                        
                         const status = bot.status_changes && bot.status_changes.length > 0 
                             ? bot.status_changes[bot.status_changes.length - 1].code 
                             : 'unknown';
