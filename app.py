@@ -58,11 +58,9 @@ print(f"Debug: Region: {RECALL_REGION}")
 print(f"Debug: Agent URL: {AGENT_URL}")
 print(f"Debug: Backend URL: {get_current_backend_url()}")
 
-# --- In-memory storage for transcripts and audio commands ---
-# In production, you would use a database like Redis or PostgreSQL.
-transcript_data_store = {}
-audio_commands_store = {}  # Store audio commands for each bot
-# A lock to ensure thread-safe access to the data store
+# Global variables for storing transcript and audio data
+transcript_data_store = {}  # bot_id -> list of transcript lines
+audio_commands_store = {}   # bot_id -> list of audio commands
 transcript_lock = threading.Lock()
 audio_lock = threading.Lock()
 
@@ -84,6 +82,10 @@ def deploy_agent():
     
     if not meeting_url:
         return jsonify({'error': 'Meeting URL is required'}), 400
+    
+    # Clean up old bot data before deploying new bot
+    print("🧹 Cleaning up old bot data before deploying new bot...")
+    cleanup_old_bots()
     
     # The webhook URL for Recall.ai to send transcript data to.
     # In production, this must be a publicly accessible URL.
@@ -150,9 +152,15 @@ def deploy_agent():
         
         if response.status_code == 201:
             bot_data = response.json()
+            new_bot_id = bot_data['id']
+            
+            # Clean up again after deployment to ensure only the new bot remains
+            print(f"🧹 Final cleanup - ensuring only new bot {new_bot_id} data is kept...")
+            cleanup_old_bots()
+            
             return jsonify({
                 'success': True,
-                'bot_id': bot_data['id'],
+                'bot_id': new_bot_id,
                 'bot_data': bot_data,  # Return full bot data
                 'message': f'AI agent deployed to meeting successfully!',
                 'region': RECALL_REGION
@@ -573,6 +581,64 @@ def delete_all_bot_media():
 def get_version():
     """Get current version information"""
     return jsonify(VERSION_INFO)
+
+@app.route('/api/cleanup-old-bots', methods=['POST'])
+def cleanup_old_bots_endpoint():
+    """Manually trigger cleanup of old bot data"""
+    most_recent_bot_id = cleanup_old_bots()
+    if most_recent_bot_id:
+        return jsonify({
+            'success': True,
+            'most_recent_bot_id': most_recent_bot_id,
+            'message': 'Old bot data cleaned up successfully'
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'Failed to cleanup old bot data'
+        }), 500
+
+def cleanup_old_bots():
+    """Remove data for old/expired bots, keeping only the most recent active bot"""
+    try:
+        # Get all bots from Recall API
+        headers = {
+            'Authorization': f'Token {RECALL_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        api_base = get_recall_api_base()
+        response = requests.get(f'{api_base}/bot', headers=headers)
+        
+        if response.status_code == 200:
+            bots_data = response.json()
+            all_bots = bots_data.get('results', []) if 'results' in bots_data else bots_data
+            
+            if all_bots:
+                # Sort by creation time to get the most recent
+                sorted_bots = sorted(all_bots, key=lambda x: x.get('created_at', ''), reverse=True)
+                most_recent_bot_id = sorted_bots[0]['id']
+                
+                print(f"🧹 Cleanup: Most recent bot ID: {most_recent_bot_id}")
+                
+                # Clean up transcript data - keep only the most recent bot
+                with transcript_lock:
+                    old_bot_ids = [bot_id for bot_id in transcript_data_store.keys() if bot_id != most_recent_bot_id]
+                    for old_bot_id in old_bot_ids:
+                        print(f"🧹 Removing old transcript data for bot: {old_bot_id}")
+                        del transcript_data_store[old_bot_id]
+                
+                # Clean up audio commands - keep only the most recent bot
+                with audio_lock:
+                    old_bot_ids = [bot_id for bot_id in audio_commands_store.keys() if bot_id != most_recent_bot_id]
+                    for old_bot_id in old_bot_ids:
+                        print(f"🧹 Removing old audio data for bot: {old_bot_id}")
+                        del audio_commands_store[old_bot_id]
+                        
+                return most_recent_bot_id
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
+    
+    return None
 
 if __name__ == '__main__':
     # Note: For local development, you'll need to use a tool like ngrok
