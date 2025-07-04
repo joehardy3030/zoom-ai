@@ -62,6 +62,11 @@ def deploy_agent():
     
     # Get our backend URL for the agent to use
     backend_url = BACKEND_URL
+    
+    # DEBUG: Print what backend URL we're actually using
+    print(f"🔍 DEBUG: BACKEND_URL from environment: {BACKEND_URL}")
+    print(f"🔍 DEBUG: backend_url variable: {backend_url}")
+    print(f"🔍 DEBUG: webhook_url: {webhook_url}")
 
     # Create bot with Real-time Transcription enabled
     bot_payload = {
@@ -93,6 +98,10 @@ def deploy_agent():
             }
         }
     }
+    
+    # DEBUG: Print the actual agent URL being sent to Recall.ai
+    agent_full_url = f"{AGENT_URL}?bot_id={'{BOT_ID}'}&backend_url={requests.utils.quote(backend_url)}"
+    print(f"🔍 DEBUG: Full agent URL being sent to Recall.ai: {agent_full_url}")
     
     headers = {
         'Authorization': f'Token {RECALL_API_KEY}',
