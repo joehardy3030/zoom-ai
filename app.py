@@ -20,6 +20,16 @@ RECALL_API_KEY = os.environ.get('RECALL_API_KEY')
 RECALL_REGION = os.environ.get('RECALL_REGION', 'us-west-2')
 AGENT_URL = os.environ.get('AGENT_URL', 'https://joehardy3030.github.io/zoom-ai/agent.html')
 
+# Load version info
+def load_version():
+    try:
+        with open('version.json', 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"version": "1.0.0", "name": "Unknown", "build_date": "Unknown"}
+
+VERSION_INFO = load_version()
+
 def get_current_backend_url():
     """Get the current backend URL from the tunnel URL file or environment"""
     try:
@@ -113,7 +123,7 @@ def deploy_agent():
                 "kind": "webpage",
                 "config": {
                     # Use our optimized agent - IMPORTANT: Use single curly braces for BOT_ID placeholder
-                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(current_backend_url)}&v=1.0.14",
+                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(current_backend_url)}&v={VERSION_INFO['version']}",
                     "width": 1280,
                     "height": 720
                 }
@@ -558,6 +568,11 @@ def delete_all_bot_media():
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/version', methods=['GET'])
+def get_version():
+    """Get current version information"""
+    return jsonify(VERSION_INFO)
 
 if __name__ == '__main__':
     # Note: For local development, you'll need to use a tool like ngrok
