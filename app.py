@@ -90,8 +90,8 @@ def deploy_agent():
             "camera": {
                 "kind": "webpage",
                 "config": {
-                    # Use our optimized agent
-                    "url": f"{AGENT_URL}?bot_id={'{BOT_ID}'}&backend_url={requests.utils.quote(backend_url)}&v=1.0.9",
+                    # Use our optimized agent - IMPORTANT: Use single curly braces for BOT_ID placeholder
+                    "url": f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(backend_url)}&v=1.0.9",
                     "width": 1280,
                     "height": 720
                 }
@@ -100,7 +100,7 @@ def deploy_agent():
     }
     
     # DEBUG: Print the actual agent URL being sent to Recall.ai
-    agent_full_url = f"{AGENT_URL}?bot_id={'{BOT_ID}'}&backend_url={requests.utils.quote(backend_url)}"
+    agent_full_url = f"{AGENT_URL}?bot_id={{BOT_ID}}&backend_url={requests.utils.quote(backend_url)}"
     print(f"🔍 DEBUG: Full agent URL being sent to Recall.ai: {agent_full_url}")
     
     headers = {
@@ -300,6 +300,75 @@ def serve_audio(filename):
     except Exception as e:
         print(f"Error serving audio file {filename}: {e}")
         return jsonify({"error": "Audio file not found"}), 404
+
+@app.route('/api/recall-bots', methods=['GET'])
+def list_recall_bots():
+    """List all bots from Recall.ai API"""
+    headers = {
+        'Authorization': f'Token {RECALL_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        api_base = get_recall_api_base()
+        response = requests.get(
+            f'{api_base}/bot',
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            bots = response.json()
+            return jsonify({
+                'success': True,
+                'bots': bots,
+                'count': len(bots.get('results', [])) if 'results' in bots else len(bots)
+            })
+        else:
+            return jsonify({
+                'error': f'Failed to list bots: {response.text}',
+                'status_code': response.status_code
+            }), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/recall-bots/<bot_id>', methods=['DELETE'])
+def delete_recall_bot(bot_id):
+    """Delete a specific bot from Recall.ai"""
+    headers = {
+        'Authorization': f'Token {RECALL_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        api_base = get_recall_api_base()
+        response = requests.delete(
+            f'{api_base}/bot/{bot_id}',
+            headers=headers
+        )
+        
+        if response.status_code == 204:
+            # Also clean up local data
+            with transcript_lock:
+                if bot_id in transcript_data_store:
+                    del transcript_data_store[bot_id]
+            
+            with audio_lock:
+                if bot_id in audio_commands_store:
+                    del audio_commands_store[bot_id]
+            
+            return jsonify({
+                'success': True,
+                'message': f'Bot {bot_id} deleted successfully'
+            })
+        else:
+            return jsonify({
+                'error': f'Failed to delete bot: {response.text}',
+                'status_code': response.status_code
+            }), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/bot/<bot_id>/play-audio', methods=['POST'])
 def play_audio(bot_id):

@@ -29,6 +29,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
+    // Check if bot ID is still a placeholder (indicates bot setup issue)
+    if (botId === '{BOT_ID}' || botId === '{{BOT_ID}}') {
+        statusEl.textContent = 'Error: Bot ID not properly configured';
+        console.error('Bot ID is still a placeholder - bot setup failed');
+        
+        // Show error message and stop polling
+        addMessage("System", "❌ Bot configuration error - stopping agent");
+        return;
+    }
+    
     // Audio state
     let currentAudio = null;
     let audioStatus = 'idle';

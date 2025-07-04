@@ -83,6 +83,19 @@
             <button type="submit" id="deployBtn">Deploy AI Agent</button>
         </form>
         
+        <!-- Bot Management -->
+        <div id="botManagement" style="margin-top: 30px; padding-top: 30px; border-top: 2px solid #e5e7eb;">
+            <h2>🤖 Bot Management</h2>
+            <p>Manage active bots from Recall.ai</p>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button onclick="listBots()">📋 List All Bots</button>
+                <button onclick="deleteAllBots()" style="background: #dc2626;">🗑️ Delete All Bots</button>
+            </div>
+            
+            <div id="botsList" style="margin-top: 20px;"></div>
+        </div>
+
         <!-- Audio Controls -->
         <div id="audioControls" style="margin-top: 30px; padding-top: 30px; border-top: 2px solid #e5e7eb; display: none;">
             <h2>🎵 Audio Controls</h2>
@@ -156,6 +169,145 @@
             }
         });
         
+        // Bot management functions
+        async function listBots() {
+            const botsListDiv = document.getElementById('botsList');
+            botsListDiv.innerHTML = '<p>Loading bots...</p>';
+            
+            try {
+                const response = await fetch('/api/recall-bots');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const bots = result.bots.results || result.bots;
+                    
+                    if (bots.length === 0) {
+                        botsListDiv.innerHTML = '<p>No active bots found.</p>';
+                        return;
+                    }
+                    
+                    let html = '<h3>Active Bots:</h3>';
+                    bots.forEach(bot => {
+                        const createdAt = new Date(bot.created_at).toLocaleString();
+                        const status = bot.status_changes && bot.status_changes.length > 0 
+                            ? bot.status_changes[bot.status_changes.length - 1].code 
+                            : 'unknown';
+                        
+                        // Determine if bot can be deleted (only scheduled bots that haven't joined)
+                        const canDelete = status === 'scheduled' || status === 'joining_call';
+                        const statusColor = status === 'done' ? '#6b7280' : 
+                                          status === 'in_call_recording' ? '#10b981' : 
+                                          status === 'call_ended' ? '#f59e0b' : '#3b82f6';
+                        
+                        html += `
+                            <div style="border: 1px solid #e5e7eb; padding: 15px; margin: 10px 0; border-radius: 8px; background: #f9fafb;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <strong>Bot ID:</strong> ${bot.id}<br>
+                                        <strong>Name:</strong> ${bot.bot_name}<br>
+                                        <strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${status}</span><br>
+                                        <strong>Created:</strong> ${createdAt}<br>
+                                        <strong>Meeting URL:</strong> ${bot.meeting_url?.meeting_id || 'N/A'}<br>
+                                        <strong>Agent URL:</strong> ${bot.output_media?.camera?.config?.url ? 'Configured' : 'Not configured'}
+                                    </div>
+                                    <div style="display: flex; gap: 10px;">
+                                        ${canDelete ? 
+                                            `<button onclick="deleteBot('${bot.id}')" style="background: #dc2626; padding: 8px 16px;">🗑️ Delete</button>` :
+                                            `<button disabled style="background: #9ca3af; padding: 8px 16px;" title="Cannot delete bots that have joined calls">🗑️ Cannot Delete</button>`
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    botsListDiv.innerHTML = html;
+                } else {
+                    botsListDiv.innerHTML = `<p style="color: #dc2626;">Error: ${result.error}</p>`;
+                }
+                
+            } catch (error) {
+                console.error('Error listing bots:', error);
+                botsListDiv.innerHTML = `<p style="color: #dc2626;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function deleteBot(botId) {
+            if (!confirm(`Are you sure you want to delete bot ${botId}?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/recall-bots/${botId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Bot deleted successfully!');
+                    listBots(); // Refresh the list
+                } else {
+                    // Handle specific error cases
+                    if (result.error && result.error.includes('cannot_delete_bot')) {
+                        alert('Cannot delete this bot - only scheduled bots that haven\'t joined a call can be deleted. This bot has already joined a meeting and completed its lifecycle.');
+                    } else {
+                        alert(`Error deleting bot: ${result.error}`);
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error deleting bot:', error);
+                alert(`Error deleting bot: ${error.message}`);
+            }
+        }
+        
+        async function deleteAllBots() {
+            if (!confirm('Are you sure you want to delete ALL bots? This cannot be undone!')) {
+                return;
+            }
+            
+            try {
+                // First get all bots
+                const response = await fetch('/api/recall-bots');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const bots = result.bots.results || result.bots;
+                    
+                    if (bots.length === 0) {
+                        alert('No bots to delete.');
+                        return;
+                    }
+                    
+                    // Delete each bot
+                    let deletedCount = 0;
+                    for (const bot of bots) {
+                        try {
+                            const deleteResponse = await fetch(`/api/recall-bots/${bot.id}`, {
+                                method: 'DELETE'
+                            });
+                            
+                            if (deleteResponse.ok) {
+                                deletedCount++;
+                            }
+                        } catch (error) {
+                            console.error(`Error deleting bot ${bot.id}:`, error);
+                        }
+                    }
+                    
+                    alert(`Deleted ${deletedCount} out of ${bots.length} bots.`);
+                    listBots(); // Refresh the list
+                } else {
+                    alert(`Error getting bots: ${result.error}`);
+                }
+                
+            } catch (error) {
+                console.error('Error deleting all bots:', error);
+                alert(`Error deleting bots: ${error.message}`);
+            }
+        }
+
         // Audio control functions
         async function playAudio() {
             const botId = document.getElementById('botIdInput').value;
