@@ -50,6 +50,23 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn('Bot ID is placeholder or invalid:', botId);
         statusEl.textContent = 'Detecting Bot ID...';
         
+        // Show early debug info
+        const earlyDebugEl = document.createElement('div');
+        earlyDebugEl.style.cssText = `
+            position: absolute; top: 10px; left: 10px; 
+            background: rgba(255,0,0,0.9); color: white; 
+            padding: 15px; font-size: 16px; font-family: monospace; 
+            z-index: 9999; line-height: 1.4; border-radius: 5px;
+            border: 2px solid #ff0000; max-width: 400px;
+        `;
+        earlyDebugEl.innerHTML = `
+            <strong>⚠️ FALLBACK MODE</strong><br>
+            Invalid Bot ID: ${botId}<br>
+            Backend: ${backendUrl}<br>
+            Trying fallback...
+        `;
+        document.body.appendChild(earlyDebugEl);
+        
         // Fallback: Try to get bot ID from backend
         const tryGetBotIdFromBackend = async () => {
             try {
@@ -107,25 +124,27 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log(`✅ Initializing with Bot ID: ${botId}, Backend: ${backendUrl}`);
         
-        // Create debug display
+        // Create debug display - ALWAYS VISIBLE for troubleshooting
         const debugEl = document.createElement('div');
         debugEl.style.cssText = `
             position: absolute; bottom: 10px; left: 10px; 
-            background: rgba(0,0,0,0.8); color: #00ff00; 
-            padding: 10px; font-size: 18px; font-family: monospace; 
+            background: rgba(0,0,0,0.9); color: #00ff00; 
+            padding: 15px; font-size: 16px; font-family: monospace; 
             z-index: 9999; line-height: 1.4; border-radius: 5px;
+            border: 2px solid #00ff00; max-width: 400px;
         `;
         document.body.appendChild(debugEl);
         
         // Update debug info
         const updateDebugInfo = () => {
             debugEl.innerHTML = `
-                Agent v1.0.10 - Enhanced Bot ID<br>
-                Bot: ${botId.substring(0, 8)}...<br>
-                Backend: ${backendUrl.substring(0, 30)}...<br>
+                <strong>🔧 DEBUG INFO v1.0.10</strong><br>
+                Bot ID: ${botId}<br>
+                Backend: ${backendUrl}<br>
                 Audio: ${audioStatus} (${isAudioPlaying ? 'Playing' : 'Idle'})<br>
                 Screen: ${window.innerWidth}x${window.innerHeight}<br>
-                Time: ${new Date().toLocaleTimeString()}
+                Time: ${new Date().toLocaleTimeString()}<br>
+                URL: ${window.location.href.substring(0, 60)}...
             `;
         };
         
