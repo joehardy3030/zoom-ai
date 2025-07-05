@@ -273,55 +273,74 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         
-        // Simple audio functions - mimicking direct browser audio that works
-        const playAudioFile = async (audioFile) => {
-            console.log(`🎵 SIMPLE: Playing ${audioFile}`);
-            
-            // Stop any existing audio
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.src = '';
-                currentAudio = null;
+        // HTML5 audio element approach - exactly like the working dashboard
+        let audioElement = null;
+        
+        // Create HTML5 audio element in the DOM
+        const createAudioElement = () => {
+            if (audioElement) {
+                audioElement.remove();
             }
             
-            // Create simple audio element like the dashboard direct audio
-            currentAudio = new Audio(`${backendUrl}/audio/${audioFile}`);
-            currentAudio.volume = 0.8;
+            audioElement = document.createElement('audio');
+            audioElement.controls = false; // Hidden controls
+            audioElement.preload = 'auto';
+            audioElement.volume = 0.8;
+            audioElement.style.display = 'none';
+            document.body.appendChild(audioElement);
             
-            // Simple play - no complex event handling
-            try {
-                await currentAudio.play();
-                console.log('🎵 SIMPLE: Audio started');
-                addMessage("System", `🎵 Playing: ${audioFile}`);
+            // Simple event handlers
+            audioElement.onended = () => {
+                console.log('🎵 HTML5: Audio ended');
+                isAudioPlaying = false;
+            };
+            
+            audioElement.onerror = (e) => {
+                console.error('🎵 HTML5: Audio error:', e);
+                isAudioPlaying = false;
+            };
+            
+            audioElement.onplay = () => {
+                console.log('🎵 HTML5: Audio started playing');
                 isAudioPlaying = true;
+            };
+        };
+        
+        // Initialize audio element
+        createAudioElement();
+        
+        // Simple audio functions using HTML5 audio element
+        const playAudioFile = async (audioFile) => {
+            console.log(`🎵 HTML5: Playing ${audioFile}`);
+            
+            try {
+                // Stop current audio
+                if (audioElement) {
+                    audioElement.pause();
+                    audioElement.currentTime = 0;
+                }
+                
+                // Set new source and play - exactly like dashboard
+                audioElement.src = `${backendUrl}/audio/${audioFile}`;
+                await audioElement.play();
+                
+                console.log('🎵 HTML5: Audio play started');
+                addMessage("System", `🎵 Playing: ${audioFile}`);
+                
             } catch (error) {
-                console.error('🎵 SIMPLE: Play failed:', error);
+                console.error('🎵 HTML5: Play failed:', error);
                 addMessage("System", `❌ Audio failed: ${error.message}`);
                 isAudioPlaying = false;
             }
-            
-            // Only listen for end event to reset state
-            currentAudio.onended = () => {
-                console.log('🎵 SIMPLE: Audio ended');
-                isAudioPlaying = false;
-                currentAudio = null;
-            };
-            
-            // Handle errors
-            currentAudio.onerror = (e) => {
-                console.error('🎵 SIMPLE: Audio error:', e);
-                isAudioPlaying = false;
-                currentAudio = null;
-            };
         };
 
         const stopAudio = () => {
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.src = '';
-                currentAudio = null;
+            if (audioElement) {
+                audioElement.pause();
+                audioElement.currentTime = 0;
+                audioElement.src = '';
                 isAudioPlaying = false;
-                console.log('🎵 SIMPLE: Audio stopped');
+                console.log('🎵 HTML5: Audio stopped');
                 addMessage("System", "⏹️ Audio stopped");
             }
         };
