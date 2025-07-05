@@ -115,6 +115,8 @@
                 <button id="playAudioBtn" onclick="playAudio()">🎵 Play Audio</button>
                 <button id="stopAudioBtn" onclick="stopAudio()">⏹️ Stop Audio</button>
                 <button onclick="testDirectAudio()" style="background: #10b981;">🧪 Test Direct Audio</button>
+                <button id="botSpeakBtn" onclick="botSpeak()" style="background: #8b5cf6;">🤖 Bot Speak</button>
+                <button id="botStopBtn" onclick="botStopSpeaking()" style="background: #ef4444;">🤖 Stop Bot</button>
             </div>
             
             <!-- Simple audio test element -->
@@ -471,6 +473,109 @@
         function testDirectAudio() {
             const testAudio = document.getElementById('testAudio');
             testAudio.style.display = testAudio.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Bot speaking functions using Recall.ai Output Audio API
+        async function botSpeak() {
+            const botId = document.getElementById('botIdInput').value;
+            if (!botId) {
+                alert('Please enter a Bot ID');
+                return;
+            }
+            
+            const botSpeakBtn = document.getElementById('botSpeakBtn');
+            
+            // Prevent multiple rapid clicks
+            if (botSpeakBtn.disabled) {
+                return;
+            }
+            
+            botSpeakBtn.disabled = true;
+            botSpeakBtn.textContent = 'Bot Speaking...';
+            
+            try {
+                const response = await fetch(`/api/bot/${botId}/speak-audio`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        audio_file: 'ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    botSpeakBtn.textContent = '✅ Bot Speaking!';
+                    botSpeakBtn.style.background = '#22c55e';
+                    console.log('✅ Bot is now speaking:', result);
+                } else {
+                    botSpeakBtn.textContent = '❌ Bot Speak Failed';
+                    botSpeakBtn.style.background = '#ef4444';
+                    console.error('❌ Bot speak failed:', result);
+                    alert(`Bot speak failed: ${result.message}`);
+                }
+                
+            } catch (error) {
+                console.error('Bot speak error:', error);
+                botSpeakBtn.textContent = '❌ Error';
+                botSpeakBtn.style.background = '#ef4444';
+                alert('Bot speak request failed');
+            }
+            
+            // Re-enable button after 3 seconds
+            setTimeout(() => {
+                botSpeakBtn.disabled = false;
+                botSpeakBtn.textContent = '🤖 Bot Speak';
+                botSpeakBtn.style.background = '#8b5cf6';
+            }, 3000);
+        }
+
+        async function botStopSpeaking() {
+            const botId = document.getElementById('botIdInput').value;
+            if (!botId) {
+                alert('Please enter a Bot ID');
+                return;
+            }
+            
+            const botStopBtn = document.getElementById('botStopBtn');
+            
+            botStopBtn.disabled = true;
+            botStopBtn.textContent = 'Stopping...';
+            
+            try {
+                const response = await fetch(`/api/bot/${botId}/stop-speaking`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    botStopBtn.textContent = '✅ Bot Stopped';
+                    botStopBtn.style.background = '#22c55e';
+                    console.log('✅ Bot stopped speaking:', result);
+                } else {
+                    botStopBtn.textContent = '❌ Stop Failed';
+                    console.error('❌ Bot stop failed:', result);
+                    alert(`Bot stop failed: ${result.message}`);
+                }
+                
+            } catch (error) {
+                console.error('Bot stop error:', error);
+                botStopBtn.textContent = '❌ Error';
+                alert('Bot stop request failed');
+            }
+            
+            // Re-enable button after 2 seconds
+            setTimeout(() => {
+                botStopBtn.disabled = false;
+                botStopBtn.textContent = '🤖 Stop Bot';
+                botStopBtn.style.background = '#ef4444';
+            }, 2000);
         }
     </script>
 </body>

@@ -769,6 +769,93 @@ def get_latest_bot_id():
             'message': 'No bot has been deployed yet'
         }), 404
 
+@app.route('/api/bot/<bot_id>/speak-audio', methods=['POST'])
+def speak_audio(bot_id):
+    """Make the Recall.ai bot speak audio through Zoom's native audio system"""
+    data = request.get_json()
+    audio_file = data.get('audio_file', 'ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3')
+    
+    print(f"🤖 BOT SPEAK: Making bot {bot_id} speak: {audio_file}")
+    
+    try:
+        # Get the current backend URL for constructing the audio file URL
+        current_backend_url = get_current_backend_url()
+        audio_url = f"{current_backend_url}/audio/{audio_file}"
+        
+        # Use Recall.ai's Output Audio API to make the bot speak
+        headers = {
+            'Authorization': f'Token {RECALL_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Output Audio API payload
+        payload = {
+            "audio_url": audio_url
+        }
+        
+        # Call Recall.ai's Output Audio API
+        recall_url = f"https://us-east-1.recall.ai/api/v1/bot/{bot_id}/output_audio/"
+        response = requests.post(recall_url, json=payload, headers=headers)
+        
+        if response.status_code == 200:
+            print(f"✅ BOT SPEAK: Successfully started bot audio output")
+            return jsonify({
+                "status": "success", 
+                "message": "Bot is now speaking",
+                "audio_file": audio_file,
+                "audio_url": audio_url
+            })
+        else:
+            print(f"❌ BOT SPEAK: Recall.ai API error: {response.status_code} - {response.text}")
+            return jsonify({
+                "status": "error", 
+                "message": f"Recall.ai API error: {response.status_code}",
+                "details": response.text
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ BOT SPEAK: Error: {str(e)}")
+        return jsonify({
+            "status": "error", 
+            "message": f"Bot speak failed: {str(e)}"
+        }), 500
+
+@app.route('/api/bot/<bot_id>/stop-speaking', methods=['POST'])
+def stop_speaking(bot_id):
+    """Stop the Recall.ai bot from speaking"""
+    print(f"🤖 BOT STOP: Stopping bot {bot_id} from speaking")
+    
+    try:
+        headers = {
+            'Authorization': f'Token {RECALL_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Call Recall.ai's Delete Output Audio API
+        recall_url = f"https://us-east-1.recall.ai/api/v1/bot/{bot_id}/output_audio/"
+        response = requests.delete(recall_url, headers=headers)
+        
+        if response.status_code in [200, 204]:
+            print(f"✅ BOT STOP: Successfully stopped bot audio output")
+            return jsonify({
+                "status": "success", 
+                "message": "Bot stopped speaking"
+            })
+        else:
+            print(f"❌ BOT STOP: Recall.ai API error: {response.status_code} - {response.text}")
+            return jsonify({
+                "status": "error", 
+                "message": f"Recall.ai API error: {response.status_code}",
+                "details": response.text
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ BOT STOP: Error: {str(e)}")
+        return jsonify({
+            "status": "error", 
+            "message": f"Bot stop failed: {str(e)}"
+        }), 500
+
 if __name__ == '__main__':
     # Note: For local development, you'll need to use a tool like ngrok
     # to expose your localhost to the internet for the webhook to work.
