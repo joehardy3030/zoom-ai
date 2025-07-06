@@ -804,9 +804,8 @@ def speak_audio(bot_id):
             'Content-Type': 'application/json'
         }
         
-        # Output Audio API payload with correct format
+        # Payload for Recall.ai Output Audio API - try without kind field
         payload = {
-            "kind": "audio",
             "b64_data": b64_audio
         }
         
