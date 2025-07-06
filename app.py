@@ -9,6 +9,7 @@ import time
 import json
 from datetime import datetime
 import re
+import base64
 
 # Load environment variables from .env file
 load_dotenv()
@@ -782,19 +783,35 @@ def speak_audio(bot_id):
         current_backend_url = get_current_backend_url()
         audio_url = f"{current_backend_url}/audio/{audio_file}"
         
+        # Read and encode the audio file as base64
+        audio_file_path = os.path.join('audio', audio_file)
+        
+        if not os.path.exists(audio_file_path):
+            print(f"❌ BOT SPEAK: Audio file not found: {audio_file_path}")
+            return jsonify({
+                "status": "error", 
+                "message": f"Audio file not found: {audio_file}"
+            }), 404
+        
+        # Read audio file and encode as base64
+        with open(audio_file_path, 'rb') as f:
+            audio_data = f.read()
+            b64_audio = base64.b64encode(audio_data).decode('utf-8')
+        
         # Use Recall.ai's Output Audio API to make the bot speak
         headers = {
             'Authorization': f'Token {RECALL_API_KEY}',
             'Content-Type': 'application/json'
         }
         
-        # Output Audio API payload
+        # Output Audio API payload with correct format
         payload = {
-            "audio_url": audio_url
+            "kind": "audio",
+            "b64_data": b64_audio
         }
         
         # Call Recall.ai's Output Audio API
-        recall_url = f"https://us-east-1.recall.ai/api/v1/bot/{bot_id}/output_audio/"
+        recall_url = f"{get_recall_api_base()}/bot/{bot_id}/output_audio/"
         response = requests.post(recall_url, json=payload, headers=headers)
         
         if response.status_code == 200:
@@ -832,7 +849,7 @@ def stop_speaking(bot_id):
         }
         
         # Call Recall.ai's Delete Output Audio API
-        recall_url = f"https://us-east-1.recall.ai/api/v1/bot/{bot_id}/output_audio/"
+        recall_url = f"{get_recall_api_base()}/bot/{bot_id}/output_audio/"
         response = requests.delete(recall_url, headers=headers)
         
         if response.status_code in [200, 204]:
