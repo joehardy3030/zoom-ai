@@ -772,68 +772,50 @@ def get_latest_bot_id():
 
 @app.route('/api/bot/<bot_id>/speak-audio', methods=['POST'])
 def speak_audio(bot_id):
-    """Make the Recall.ai bot speak audio through Zoom's native audio system"""
+    """Make the Recall.ai bot send a chat message instead of trying to play audio"""
     data = request.get_json()
     audio_file = data.get('audio_file', 'ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3')
     
-    print(f"🤖 BOT SPEAK: Making bot {bot_id} speak: {audio_file}")
+    print(f"🤖 BOT CHAT: Making bot {bot_id} send chat message about: {audio_file}")
     
     try:
-        # Get the current backend URL for constructing the audio file URL
-        current_backend_url = get_current_backend_url()
-        audio_url = f"{current_backend_url}/audio/{audio_file}"
-        
-        # Read and encode the audio file as base64
-        audio_file_path = os.path.join('audio', audio_file)
-        
-        if not os.path.exists(audio_file_path):
-            print(f"❌ BOT SPEAK: Audio file not found: {audio_file_path}")
-            return jsonify({
-                "status": "error", 
-                "message": f"Audio file not found: {audio_file}"
-            }), 404
-        
-        # Read audio file and encode as base64
-        with open(audio_file_path, 'rb') as f:
-            audio_data = f.read()
-            b64_audio = base64.b64encode(audio_data).decode('utf-8')
-        
-        # Use Recall.ai's Output Audio API to make the bot speak
+        # Use Recall.ai's Send Chat Message API instead
         headers = {
             'Authorization': f'Token {RECALL_API_KEY}',
             'Content-Type': 'application/json'
         }
         
-        # Payload for Recall.ai Output Audio API - try without kind field
+        # Send a chat message indicating the bot is "speaking"
+        message = f"🎵 AI Assistant is playing audio: {audio_file.replace('ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3', 'Welcome message')}"
+        
         payload = {
-            "b64_data": b64_audio
+            "message": message
         }
         
-        # Call Recall.ai's Output Audio API
-        recall_url = f"{get_recall_api_base()}/bot/{bot_id}/output_audio/"
+        # Call Recall.ai's Send Chat Message API
+        recall_url = f"{get_recall_api_base()}/bot/{bot_id}/send_chat_message/"
         response = requests.post(recall_url, json=payload, headers=headers)
         
         if response.status_code == 200:
-            print(f"✅ BOT SPEAK: Successfully started bot audio output")
+            print(f"✅ BOT CHAT: Successfully sent chat message")
             return jsonify({
-                "status": "success", 
-                "message": "Bot is now speaking",
-                "audio_file": audio_file,
-                "audio_url": audio_url
+                "status": "chat message sent", 
+                "message": message,
+                "bot_id": bot_id
             })
         else:
-            print(f"❌ BOT SPEAK: Recall.ai API error: {response.status_code} - {response.text}")
+            error_msg = response.text
+            print(f"❌ BOT CHAT: Recall.ai API error: {response.status_code} - {error_msg}")
             return jsonify({
                 "status": "error", 
-                "message": f"Recall.ai API error: {response.status_code}",
-                "details": response.text
+                "message": f"Failed to send chat message: {error_msg}"
             }), 500
             
     except Exception as e:
-        print(f"❌ BOT SPEAK: Error: {str(e)}")
+        print(f"❌ BOT CHAT: Exception: {str(e)}")
         return jsonify({
             "status": "error", 
-            "message": f"Bot speak failed: {str(e)}"
+            "message": f"Exception occurred: {str(e)}"
         }), 500
 
 @app.route('/api/bot/<bot_id>/stop-speaking', methods=['POST'])
