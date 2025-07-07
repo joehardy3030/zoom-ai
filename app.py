@@ -817,7 +817,7 @@ def speak_audio(bot_id):
         }
         
         # Call Recall.ai's Output Audio API
-        recall_url = f"{get_recall_api_base_url()}/bot/{bot_id}/output_audio/"
+        recall_url = f"{get_recall_api_base()}/bot/{bot_id}/output_audio/"
         response = requests.post(recall_url, json=payload, headers=headers)
         
         if response.status_code == 200:
