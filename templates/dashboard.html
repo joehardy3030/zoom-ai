@@ -198,10 +198,20 @@
                     
                     let html = '<h3>Active Bots:</h3>';
                     bots.forEach(bot => {
-                        // Better date parsing with error handling - use join_at field
+                        // Better date parsing - use the first status change (when bot actually started)
                         let createdAt = 'Unknown';
                         try {
-                            if (bot.join_at) {
+                            if (bot.status_changes && bot.status_changes.length > 0) {
+                                // Use the first status change timestamp (usually "joining_call")
+                                const firstStatus = bot.status_changes[0];
+                                if (firstStatus.created_at) {
+                                    const date = new Date(firstStatus.created_at);
+                                    if (!isNaN(date.getTime())) {
+                                        createdAt = date.toLocaleString();
+                                    }
+                                }
+                            } else if (bot.join_at) {
+                                // Fallback to scheduled join time if no status changes
                                 const date = new Date(bot.join_at);
                                 if (!isNaN(date.getTime())) {
                                     createdAt = date.toLocaleString();
