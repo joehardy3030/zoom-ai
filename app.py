@@ -772,21 +772,20 @@ def get_latest_bot_id():
 
 @app.route('/api/bot/<bot_id>/speak-audio', methods=['POST'])
 def speak_audio(bot_id):
-    """Make the Recall.ai bot send a chat message instead of trying to play audio"""
+    """Send chat message AND trigger direct audio playback"""
     data = request.get_json()
     audio_file = data.get('audio_file', 'ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3')
     
-    print(f"🤖 BOT CHAT: Making bot {bot_id} send chat message about: {audio_file}")
+    print(f"🤖 BOT HYBRID: Chat message + direct audio trigger for bot {bot_id}: {audio_file}")
     
     try:
-        # Use Recall.ai's Send Chat Message API instead
+        # 1. Send chat message to meeting participants
         headers = {
             'Authorization': f'Token {RECALL_API_KEY}',
             'Content-Type': 'application/json'
         }
         
-        # Send a chat message indicating the bot is "speaking"
-        message = f"🎵 AI Assistant is playing audio: {audio_file.replace('ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3', 'Welcome message')}"
+        message = f"🎵 AI Assistant is playing audio: Welcome message"
         
         payload = {
             "message": message
@@ -794,25 +793,37 @@ def speak_audio(bot_id):
         
         # Call Recall.ai's Send Chat Message API
         recall_url = f"{get_recall_api_base()}/bot/{bot_id}/send_chat_message/"
-        response = requests.post(recall_url, json=payload, headers=headers)
+        chat_response = requests.post(recall_url, json=payload, headers=headers)
         
-        if response.status_code == 200:
-            print(f"✅ BOT CHAT: Successfully sent chat message")
+        # 2. ALSO trigger direct browser audio (like the old system)
+        with audio_lock:
+            audio_commands_store[bot_id] = {
+                "command": "play",
+                "audio_file": audio_file,
+                "timestamp": time.time(),
+                "served": False
+            }
+        
+        if chat_response.status_code == 200:
+            print(f"✅ BOT HYBRID: Chat message sent + audio command queued")
             return jsonify({
-                "status": "chat message sent", 
-                "message": message,
+                "status": "hybrid success", 
+                "message": "Chat message sent and audio triggered",
+                "chat_message": message,
+                "audio_file": audio_file,
                 "bot_id": bot_id
             })
         else:
-            error_msg = response.text
-            print(f"❌ BOT CHAT: Recall.ai API error: {response.status_code} - {error_msg}")
+            # Even if chat fails, still trigger audio
+            print(f"⚠️ BOT HYBRID: Chat failed but audio still triggered")
             return jsonify({
-                "status": "error", 
-                "message": f"Failed to send chat message: {error_msg}"
-            }), 500
+                "status": "partial success", 
+                "message": "Audio triggered, chat message may have failed",
+                "audio_file": audio_file
+            })
             
     except Exception as e:
-        print(f"❌ BOT CHAT: Exception: {str(e)}")
+        print(f"❌ BOT HYBRID: Exception: {str(e)}")
         return jsonify({
             "status": "error", 
             "message": f"Exception occurred: {str(e)}"
@@ -853,6 +864,37 @@ def stop_speaking(bot_id):
             "status": "error", 
             "message": f"Bot stop failed: {str(e)}"
         }), 500
+
+@app.route('/api/bot/<bot_id>/chat-messages', methods=['GET'])
+def get_chat_messages(bot_id):
+    """Get recent chat messages for audio command detection"""
+    try:
+        headers = {
+            'Authorization': f'Token {RECALL_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Get bot details which may include chat messages
+        recall_url = f"{get_recall_api_base()}/bot/{bot_id}/"
+        response = requests.get(recall_url, headers=headers)
+        
+        if response.status_code == 200:
+            bot_data = response.json()
+            # Return mock chat messages for now - this would need proper chat API integration
+            return jsonify({
+                "messages": [
+                    {
+                        "message": "🎵 AUDIO_COMMAND:play:ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3 - AI Assistant is playing audio",
+                        "timestamp": time.time()
+                    }
+                ]
+            })
+        else:
+            return jsonify({"messages": []}), 200
+            
+    except Exception as e:
+        print(f"❌ Chat messages error: {str(e)}")
+        return jsonify({"messages": []}), 200
 
 if __name__ == '__main__':
     # Note: For local development, you'll need to use a tool like ngrok

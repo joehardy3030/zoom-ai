@@ -215,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let audioPollingInterval = null;
         let lastTimestamp = 0;
         let lastAudioCommandTimestamp = 0; // Track last audio command to prevent duplicates
+        let lastProcessedAudioCommand = null; // Track last processed chat audio command
         let versionInfo = null;
         
         console.log(`✅ Initializing with Bot ID: ${botId}, Backend: ${backendUrl}`);
@@ -442,6 +443,31 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(fetchTranscript, 500);
         setTimeout(pollAudioCommands, 1000);
         startPolling();
+        
+        // Monitor chat messages for audio commands
+        const checkForAudioCommands = async () => {
+            try {
+                const response = await fetch(`${backendUrl}/api/bot/${botId}/chat-messages`);
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                if (data.messages && data.messages.length > 0) {
+                    const latestMessage = data.messages[data.messages.length - 1];
+                    
+                    // Check for AUDIO_COMMAND in chat messages
+                    if (latestMessage.message && latestMessage.message.includes('AUDIO_COMMAND:play:')) {
+                        const audioFile = latestMessage.message.match(/AUDIO_COMMAND:play:([^\s]+)/)?.[1];
+                        if (audioFile && audioFile !== lastProcessedAudioCommand) {
+                            console.log('🎵 Detected audio command from chat:', audioFile);
+                            lastProcessedAudioCommand = audioFile;
+                            await playAudioFile(audioFile);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Chat monitoring error:', error);
+            }
+        };
         
         const version = versionInfo ? `v${versionInfo.version}` : 'Unknown';
         console.log(`🤖 Agent ${version} initialized with enhanced bot ID handling`);
