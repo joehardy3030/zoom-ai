@@ -115,7 +115,7 @@
                 <button id="playAudioBtn" onclick="playAudio()">🎵 Play Audio</button>
                 <button id="stopAudioBtn" onclick="stopAudio()">⏹️ Stop Audio</button>
                 <button onclick="testDirectAudio()" style="background: #10b981;">🧪 Test Direct Audio</button>
-                <button id="botSpeakBtn" onclick="botSpeak()" style="background: #8b5cf6;">🎵 Bot Audio + Chat</button>
+                <button id="botSpeakBtn" onclick="botSpeak()" style="background: #8b5cf6;">🎤 Native Bot Audio</button>
                 <button id="botStopBtn" onclick="botStopSpeaking()" style="background: #ef4444;">🤖 Stop Bot</button>
             </div>
             
@@ -527,7 +527,7 @@
             // Re-enable button after 3 seconds
             setTimeout(() => {
                 botSpeakBtn.disabled = false;
-                botSpeakBtn.textContent = '🎵 Bot Audio + Chat';
+                botSpeakBtn.textContent = '🎤 Native Bot Audio';
                 botSpeakBtn.style.background = '#8b5cf6';
             }, 3000);
         }

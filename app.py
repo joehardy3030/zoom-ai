@@ -136,6 +136,15 @@ def deploy_agent():
                     "height": 720
                 }
             }
+        },
+        # REQUIRED: Enable Output Audio API with silent MP3 workaround
+        "automatic_audio_output": {
+            "in_call_recording": {
+                "data": {
+                    "kind": "mp3",
+                    "b64_data": "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAASDs90hvAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABfiAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEZAAADwAABHiAAARYiABfiAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                }
+            }
         }
     }
     
@@ -772,61 +781,67 @@ def get_latest_bot_id():
 
 @app.route('/api/bot/<bot_id>/speak-audio', methods=['POST'])
 def speak_audio(bot_id):
-    """Send chat message AND trigger direct audio playback"""
+    """Use Recall.ai's native Output Audio API for crystal clear audio"""
     data = request.get_json()
     audio_file = data.get('audio_file', 'ElevenLabs_2025-06-06T23_00_36_karma_20250606-VO_pvc_sp100_s63_sb67_se0_b_m2.mp3')
     
-    print(f"🤖 BOT HYBRID: Chat message + direct audio trigger for bot {bot_id}: {audio_file}")
+    print(f"🤖 BOT NATIVE AUDIO: Making bot {bot_id} play native audio: {audio_file}")
     
     try:
-        # 1. Send chat message to meeting participants
+        # Read and encode the audio file as base64
+        import base64
+        audio_file_path = os.path.join('audio', audio_file)
+        
+        if not os.path.exists(audio_file_path):
+            print(f"❌ BOT NATIVE AUDIO: Audio file not found: {audio_file_path}")
+            return jsonify({
+                "status": "error", 
+                "message": f"Audio file not found: {audio_file}"
+            }), 404
+        
+        # Read audio file and encode as base64
+        with open(audio_file_path, 'rb') as f:
+            audio_data = f.read()
+            b64_audio = base64.b64encode(audio_data).decode('utf-8')
+        
+        # Use Recall.ai's Output Audio API with correct format
         headers = {
             'Authorization': f'Token {RECALL_API_KEY}',
             'Content-Type': 'application/json'
         }
         
-        message = f"🎵 AI Assistant is playing audio: Welcome message"
-        
+        # Payload with correct format from documentation
         payload = {
-            "message": message
+            "kind": "mp3",
+            "b64_data": b64_audio
         }
         
-        # Call Recall.ai's Send Chat Message API
-        recall_url = f"{get_recall_api_base()}/bot/{bot_id}/send_chat_message/"
-        chat_response = requests.post(recall_url, json=payload, headers=headers)
+        # Call Recall.ai's Output Audio API
+        recall_url = f"{get_recall_api_base_url()}/bot/{bot_id}/output_audio/"
+        response = requests.post(recall_url, json=payload, headers=headers)
         
-        # 2. ALSO trigger direct browser audio (like the old system)
-        with audio_lock:
-            audio_commands_store[bot_id] = {
-                "command": "play",
-                "audio_file": audio_file,
-                "timestamp": time.time(),
-                "served": False
-            }
-        
-        if chat_response.status_code == 200:
-            print(f"✅ BOT HYBRID: Chat message sent + audio command queued")
+        if response.status_code == 200:
+            print(f"✅ BOT NATIVE AUDIO: Successfully triggered native audio output")
             return jsonify({
-                "status": "hybrid success", 
-                "message": "Chat message sent and audio triggered",
-                "chat_message": message,
+                "status": "success", 
+                "message": "Native audio playing through Zoom",
                 "audio_file": audio_file,
                 "bot_id": bot_id
             })
         else:
-            # Even if chat fails, still trigger audio
-            print(f"⚠️ BOT HYBRID: Chat failed but audio still triggered")
+            error_msg = response.text
+            print(f"❌ BOT NATIVE AUDIO: Recall.ai API error: {response.status_code} - {error_msg}")
             return jsonify({
-                "status": "partial success", 
-                "message": "Audio triggered, chat message may have failed",
-                "audio_file": audio_file
-            })
+                "status": "error", 
+                "message": f"Recall.ai API error: {response.status_code}",
+                "details": error_msg
+            }), 500
             
     except Exception as e:
-        print(f"❌ BOT HYBRID: Exception: {str(e)}")
+        print(f"❌ BOT NATIVE AUDIO: Exception: {str(e)}")
         return jsonify({
             "status": "error", 
-            "message": f"Exception occurred: {str(e)}"
+            "message": f"Native audio failed: {str(e)}"
         }), 500
 
 @app.route('/api/bot/<bot_id>/stop-speaking', methods=['POST'])
