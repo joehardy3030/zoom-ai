@@ -198,11 +198,11 @@
                     
                     let html = '<h3>Active Bots:</h3>';
                     bots.forEach(bot => {
-                        // Better date parsing with error handling
+                        // Better date parsing with error handling - use join_at field
                         let createdAt = 'Unknown';
                         try {
-                            if (bot.created_at) {
-                                const date = new Date(bot.created_at);
+                            if (bot.join_at) {
+                                const date = new Date(bot.join_at);
                                 if (!isNaN(date.getTime())) {
                                     createdAt = date.toLocaleString();
                                 }

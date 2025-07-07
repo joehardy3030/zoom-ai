@@ -911,6 +911,8 @@ def get_chat_messages(bot_id):
         print(f"❌ Chat messages error: {str(e)}")
         return jsonify({"messages": []}), 200
 
+
+
 if __name__ == '__main__':
     # Note: For local development, you'll need to use a tool like ngrok
     # to expose your localhost to the internet for the webhook to work.
